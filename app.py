@@ -70,21 +70,21 @@ def render_product_column(idx, product, visible_fields):
         with st.container():
             st.markdown(f"<div style='padding-top: 10px; font-weight: bold'>[{idx + 1}]</div>", unsafe_allow_html=True)
             with st.popover(f"Options for [{idx + 1}]"):
-                if idx > 0 and st.button("⬅️ Move Left"):
+                if idx > 0 and st.button("⬅️ Move Left", key=f"move_left_{idx}"):
                     st.session_state.product_data[idx - 1], st.session_state.product_data[idx] = (
                         st.session_state.product_data[idx],
                         st.session_state.product_data[idx - 1],
                     )
                     st.rerun()
 
-                if idx < st.session_state.num_columns - 1 and st.button("➡️ Move Right"):
+                if idx < st.session_state.num_columns - 1 and st.button("➡️ Move Right", key=f"move_right_{idx}"):
                     st.session_state.product_data[idx + 1], st.session_state.product_data[idx] = (
                         st.session_state.product_data[idx],
                         st.session_state.product_data[idx + 1],
                     )
                     st.rerun()
 
-                if st.button("🗑️ Remove Product"):
+                if st.button("🗑️ Remove Product", key=f"remove_product_{idx}"):
                     st.session_state.product_data.pop(idx)
                     st.session_state.num_columns -= 1
                     st.rerun()

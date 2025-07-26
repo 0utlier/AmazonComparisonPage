@@ -114,8 +114,9 @@ if add_col:
     st.session_state.product_data.append({})
     st.session_state.num_columns += 1
 
-# Render product columns
-cols = st.columns(st.session_state.num_columns)
-for i in range(st.session_state.num_columns):
-    with cols[i]:
-        render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
+# Render product columns if there are any
+if st.session_state.num_columns > 0:
+    cols = st.columns(st.session_state.num_columns)
+    for i in range(st.session_state.num_columns):
+        with cols[i]:
+            render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)

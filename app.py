@@ -88,7 +88,7 @@ def render_product_column(idx, product, visible_fields):
     # --- Buttons ---
     amazon_url = product.get("url", "")
     with open_col:
-        if st.button("🛒", key=f"amazon_{idx"}, help="Open in Amazon"):
+        if st.button("🛒", key=f"amazon_{idx}", help="Open in Amazon"):
             if amazon_url:
                 st.markdown(f'<script>window.open("{amazon_url}");</script>', unsafe_allow_html=True)
 

@@ -69,7 +69,7 @@ def render_product_column(idx, product, visible_fields):
     with col[0]:
         with st.container():
             st.markdown(f"<div style='padding-top: 10px; font-weight: bold'>[{idx + 1}]</div>", unsafe_allow_html=True)
-            with st.popover(f"Options for [{idx + 1}]"):
+            with st.popover(f"<X>"):
                 if idx > 0 and st.button("⬅️ Move Left", key=f"move_left_{idx}"):
                     st.session_state.product_data[idx - 1], st.session_state.product_data[idx] = (
                         st.session_state.product_data[idx],

@@ -1,173 +1,170 @@
 import streamlit as st
 import requests
-from urllib.parse import quote_plus
+import base64
+import json
 
 st.set_page_config(layout="wide")
-
 st.title("🛍️ Amazon Product Comparison")
 
 SCRAPER_API_KEY = "deebcab27baee26c8f8b61e466fde368"
 
-DEFAULT_FIELDS = ["title", "price", "rating", "imageGallery"]
-ALL_FIELDS = [
-    "title",
-    "price",
-    "rating",
-    "imageGallery",
-    "description",
-    "brand",
-    "availability",
-    "features",
-    "categories",
-]
+# --- CSS ---
+st.markdown("""
+    <style>
+        .url-box-container {
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+        .product-index {
+            font-weight: bold;
+            margin-right: 0.5rem;
+            white-space: nowrap;
+        }
+        .scrollable-url input {
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+        .paste-button {
+            margin-left: -2.5rem;
+            z-index: 10;
+        }
+        .option-menu {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.1rem;
+            margin-right: 0.5rem;
+        }
+        .field-toggle-section > div {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-if "visible_fields" not in st.session_state:
-    st.session_state.visible_fields = DEFAULT_FIELDS.copy()
+# --- Helper functions ---
+def fetch_amazon_data(product_url):
+    try:
+        params = {
+            "api_key": SCRAPER_API_KEY,
+            "url": product_url
+        }
+        r = requests.get("http://api.scraperapi.com", params=params)
+        return r.json()
+    except Exception as e:
+        return {"error": str(e)}
 
+def parse_product_data(raw_data):
+    return {
+        "title": raw_data.get("title", "Unknown Title"),
+        "price": raw_data.get("price", "N/A"),
+        "rating": raw_data.get("rating", "N/A"),
+        "reviews": raw_data.get("reviews", []),
+        "images": raw_data.get("images", [])
+    }
+
+# --- State initialization ---
 if "product_data" not in st.session_state:
     st.session_state.product_data = []
 
+if "visible_fields" not in st.session_state:
+    st.session_state.visible_fields = {"title": True, "price": True, "rating": True, "images": True}
+
 if "num_columns" not in st.session_state:
-    st.session_state.num_columns = 2
+    st.session_state.num_columns = 0
 
+# --- Field toggles ---
+with st.sidebar:
+    st.header("Display Options")
+    field_col = st.container()
+    with field_col:
+        if st.button("Default"):
+            st.session_state.visible_fields = {"title": True, "price": True, "rating": True, "images": True}
+        if st.button("All"):
+            for k in st.session_state.visible_fields:
+                st.session_state.visible_fields[k] = True
+        if st.button("None"):
+            for k in st.session_state.visible_fields:
+                st.session_state.visible_fields[k] = False
+    for key in st.session_state.visible_fields:
+        st.checkbox(f"{key.capitalize()}", key=key, value=st.session_state.visible_fields[key])
 
-def display_field_selector():
-    with st.sidebar.expander("🧰 DISPLAY OPTIONS", expanded=True):
-        if st.button("✅ Default Options"):
-            st.session_state.visible_fields = DEFAULT_FIELDS.copy()
+# --- Add product button ---
+if st.button("➕ Add Product Column", help="Add a new Amazon product URL to compare"):
+    st.session_state.product_data.append({"url": "", "fetched": False})
+    st.session_state.num_columns += 1
 
-        if st.button("🔁 ALL / NONE"):
-            if len(st.session_state.visible_fields) == len(ALL_FIELDS):
-                st.session_state.visible_fields = []
-            else:
-                st.session_state.visible_fields = ALL_FIELDS.copy()
-
-        for field in ALL_FIELDS:
-            checked = field in st.session_state.visible_fields
-            if st.checkbox(field, value=checked, key=f"chk_{field}"):
-                if field not in st.session_state.visible_fields:
-                    st.session_state.visible_fields.append(field)
-            else:
-                if field in st.session_state.visible_fields:
-                    st.session_state.visible_fields.remove(field)
-
-
-@st.cache_data(show_spinner=False)
-def fetch_amazon_data(url):
-    api_url = f"http://api.scraperapi.com?api_key={SCRAPER_API_KEY}&url={quote_plus(url)}&autoparse=true"
-    try:
-        r = requests.get(api_url, timeout=15)
-        r.raise_for_status()
-        return r.json()
-    except:
-        return {}
+# --- Render product columns ---
+cols = st.columns(st.session_state.num_columns) if st.session_state.num_columns > 0 else []
 
 def render_product_column(idx, product, visible_fields):
-    col = st.columns([0.7, 5.3, 0.5, 0.5])  # Label, URL, Amazon, Refresh
+    with cols[idx]:
+        # Row: Product index and Options
+        st.markdown(
+            f'<div class="url-box-container">'
+            f'<span class="product-index">[{idx + 1}]</span>',
+            unsafe_allow_html=True
+        )
 
-    # --- Column label with dropdown ---
-    with col[0]:
-        with st.container():
-            st.markdown(f"<div style='padding-top: 10px; font-weight: bold'>[{idx + 1}]</div>", unsafe_allow_html=True)
-            with st.popover(f"<X>"):
-                if idx > 0 and st.button("⬅️ Move Left", key=f"move_left_{idx}"):
-                    st.session_state.product_data[idx - 1], st.session_state.product_data[idx] = (
-                        st.session_state.product_data[idx],
-                        st.session_state.product_data[idx - 1],
-                    )
-                    st.rerun()
+        # Options menu icon
+        if st.button("⬅️", key=f"left_{idx}", help="Move Left") and idx > 0:
+            st.session_state.product_data[idx - 1], st.session_state.product_data[idx] = \
+                st.session_state.product_data[idx], st.session_state.product_data[idx - 1]
+            st.experimental_rerun()
 
-                if idx < st.session_state.num_columns - 1 and st.button("➡️ Move Right", key=f"move_right_{idx}"):
-                    st.session_state.product_data[idx + 1], st.session_state.product_data[idx] = (
-                        st.session_state.product_data[idx],
-                        st.session_state.product_data[idx + 1],
-                    )
-                    st.rerun()
+        if st.button("❌", key=f"remove_{idx}", help="Remove Product"):
+            st.session_state.product_data.pop(idx)
+            st.session_state.num_columns -= 1
+            st.experimental_rerun()
 
-                if st.button("🗑️ Remove Product", key=f"remove_product_{idx}"):
-                    st.session_state.product_data.pop(idx)
-                    st.session_state.num_columns -= 1
-                    st.rerun()
+        if st.button("➡️", key=f"right_{idx}", help="Move Right") and idx < st.session_state.num_columns - 1:
+            st.session_state.product_data[idx + 1], st.session_state.product_data[idx] = \
+                st.session_state.product_data[idx], st.session_state.product_data[idx + 1]
+            st.experimental_rerun()
 
-    # --- URL input with embedded paste button ---
-    with col[1]:
-        url_input_key = f"url_{idx}"
-        default_url = product.get("url", "")
-        input_cols = st.columns([8, 1])
-        with input_cols[0]:
-            url = st.text_input(
-                "",
-                value=default_url,
-                placeholder="Paste Amazon product URL here",
-                key=url_input_key,
-                label_visibility="collapsed"
-            )
-        with input_cols[1]:
-            if st.button("📋", key=f"paste_{idx}", help="Paste from clipboard"):
-                pasted = st.clipboard_get()
-                st.session_state.product_data[idx]["url"] = pasted
-                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        st.session_state.product_data[idx]["url"] = url
+        # Row: URL input & Paste button
+        url_col = st.empty()
+        with url_col:
+            st.markdown('<div class="scrollable-url">', unsafe_allow_html=True)
+            url_input = st.text_input(f"Product URL {idx}", product.get("url", ""), key=f"url_{idx}")
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- Amazon link button ---
-    with col[2]:
-        if st.button("🛒", key=f"amazon_{idx}", help="Open in Amazon"):
-            if url:
-                st.markdown(f'<script>window.open("{url}");</script>', unsafe_allow_html=True)
+            paste_button = st.button("📋", key=f"paste_{idx}", help="Paste from clipboard")
+            if paste_button:
+                st.session_state.product_data[idx]["url"] = st.experimental_get_query_params().get("url_clipboard", [""])[0]
 
-    # --- Refresh button ---
-    with col[3]:
-        if st.button("🔄", key=f"refresh_{idx}", help="Refresh product"):
-            st.cache_data.clear()
-            st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
-            st.rerun()
+        if url_input != product.get("url", ""):
+            st.session_state.product_data[idx]["url"] = url_input
+            st.session_state.product_data[idx]["fetched"] = False
 
-    # --- Load data if needed ---
-    if url:
-        if "json" not in product:
-            with st.spinner("Loading... 🔄 A"):
-                st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
+        # Fetch & display data
+        if not product.get("fetched") and url_input.strip():
+            raw = fetch_amazon_data(url_input)
+            st.session_state.product_data[idx].update(parse_product_data(raw))
+            st.session_state.product_data[idx]["fetched"] = True
 
-        product_data = st.session_state.product_data[idx].get("json", {})
+        # Display info
+        if visible_fields.get("title"):
+            st.subheader(st.session_state.product_data[idx].get("title", ""))
 
-        for field in visible_fields:
-            if field == "title":
-                title = product_data.get("title", "N/A")
-                st.markdown(f"<div style='font-size: 14pt; font-weight: bold'>{title[:150]}{'...' if len(title)>150 else ''}</div>", unsafe_allow_html=True)
+        if visible_fields.get("price"):
+            st.write(f"💲 Price: {st.session_state.product_data[idx].get('price', 'N/A')}")
 
-            elif field == "price":
-                price = product_data.get("pricing", {}).get("price", "N/A")
-                st.markdown(f"💰 **{price}**")
+        if visible_fields.get("rating"):
+            st.write(f"⭐ Rating: {st.session_state.product_data[idx].get('rating', 'N/A')}")
 
-            elif field == "rating":
-                rating = product_data.get("reviews", [{}])[0].get("rating", "N/A")
-                count = product_data.get("reviews", [{}])[0].get("count", "N/A")
-                st.markdown(f"⭐ {rating} [👤 {count}]")
+        if visible_fields.get("images"):
+            images = st.session_state.product_data[idx].get("images", [])
+            if images:
+                st.image(images, width=150, caption=None, use_column_width="auto")
 
-            elif field == "imageGallery":
-                imgs = product_data.get("images", [])
-                if imgs:
-                    st.image(imgs, width=200, caption=None, use_column_width="auto")
-                else:
-                    st.markdown("🖼️ No images found")
+        if st.button("🛒", key=f"amazon_btn_{idx}", help="Open in Amazon"):
+            st.markdown(f"[Open Product on Amazon]({url_input})")
 
-            else:
-                val = product_data.get(field, "N/A")
-                st.write(f"**{field.capitalize()}**: {val}")
-
-
-# ----------- MAIN -----------
-display_field_selector()
-
-if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
-    st.session_state.num_columns += 1
-    st.rerun()
-
-cols = st.columns(st.session_state.num_columns)
-
+# --- Loop through columns ---
 for i in range(st.session_state.num_columns):
-    if i >= len(st.session_state.product_data):
-        st.session_state.product_data.append({"url": ""})
-    with cols[i]:
-        render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
+    render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)

@@ -1,16 +1,15 @@
 import streamlit as st
 import requests
 from urllib.parse import quote_plus
-import time
 
 st.set_page_config(layout="wide")
 
 st.title("🛍️ Amazon Product Comparison")
 
 # ----------- SETTINGS -----------
-SCRAPER_API_KEY = "35f8598646ada9354f674b49850216b4"  # Replace with your key if different
+SCRAPER_API_KEY = "deebcab27baee26c8f8b61e466fde368"
 
-DEFAULT_FIELDS = ["title", "price", "rating"]
+DEFAULT_FIELDS = ["title", "price", "rating", "imageGallery"]
 ALL_FIELDS = [
     "title",
     "price",
@@ -30,14 +29,17 @@ if "visible_fields" not in st.session_state:
 if "product_data" not in st.session_state:
     st.session_state.product_data = []
 
+if "num_columns" not in st.session_state:
+    st.session_state.num_columns = 2
+
 # ----------- DISPLAY OPTIONS DROPDOWN -----------
 def display_field_selector():
     with st.sidebar.expander("🧰 DISPLAY OPTIONS", expanded=True):
-        col1, col2 = st.columns([1, 1])
-        if col1.button("✅ Default Options"):
+        b1, b2 = st.columns([1, 1])
+        if b1.button("✅ Default Options"):
             st.session_state.visible_fields = DEFAULT_FIELDS.copy()
 
-        if col2.button("🔁 ALL / NONE"):
+        if b2.button("🔁 ALL / NONE"):
             if len(st.session_state.visible_fields) == len(ALL_FIELDS):
                 st.session_state.visible_fields = []
             else:
@@ -65,27 +67,44 @@ def fetch_amazon_data(url):
 
 # ----------- PRODUCT COLUMN -----------
 def render_product_column(idx, product, visible_fields):
-    st.markdown(f"### [ {idx + 1} ]")
-    url_col, btn_col, refresh_col = st.columns([6, 1, 1])
+    label_col, url_col, open_col, refresh_col = st.columns([0.4, 6, 1, 1])
+
+    # --- Label + URL input with paste button inside ---
+    with label_col:
+        st.markdown(f"**[{idx + 1}]**")
 
     with url_col:
-        url = st.text_input(f"Product URL {idx + 1}", product.get("url", ""), key=f"url_{idx}")
-    with btn_col:
-        if st.button("📋", key=f"paste_{idx}"):
-            st.session_state.product_data[idx]["url"] = st.clipboard_get()
+        with st.container():
+            url_input_key = f"url_{idx}"
+            url = st.text_input(
+                "",
+                value=product.get("url", ""),
+                placeholder="Paste Amazon product URL here",
+                key=url_input_key,
+                label_visibility="collapsed"
+            )
+            st.session_state.product_data[idx]["url"] = url
 
+    # --- Buttons ---
+    amazon_url = product.get("url", "")
+    with open_col:
+        if st.button("🛒", key=f"amazon_{idx"}, help="Open in Amazon"):
+            if amazon_url:
+                st.markdown(f'<script>window.open("{amazon_url}");</script>', unsafe_allow_html=True)
+
+    with refresh_col:
+        if st.button("🔄", key=f"refresh_{idx}", help="Refresh product"):
+            st.cache_data.clear()
+            st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
+            st.rerun()
+
+    # --- Load product JSON if needed ---
     if url:
-        with refresh_col:
-            if st.button("🔄", key=f"refresh_{idx}"):
-                st.cache_data.clear()
-                st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
-                st.rerun()
-
         if "json" not in product:
             with st.spinner("Loading... 🔄 A"):
                 st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
 
-        product_data = st.session_state.product_data[idx]["json"]
+        product_data = st.session_state.product_data[idx].get("json", {})
 
         for field in visible_fields:
             if field == "title":
@@ -112,15 +131,15 @@ def render_product_column(idx, product, visible_fields):
                 val = product_data.get(field, "N/A")
                 st.write(f"**{field.capitalize()}**: {val}")
 
-# ----------- RENDER PAGE -----------
+# ----------- MAIN UI -----------
 display_field_selector()
 
-# Add product columns
-if "num_columns" not in st.session_state:
-    st.session_state.num_columns = 2
+# Top of page button to add a product column
+if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
+    st.session_state.num_columns += 1
+    st.rerun()
 
-st.markdown("### Products:")
-
+# Product Columns
 cols = st.columns(st.session_state.num_columns)
 
 for i in range(st.session_state.num_columns):
@@ -128,8 +147,3 @@ for i in range(st.session_state.num_columns):
         st.session_state.product_data.append({"url": ""})
     with cols[i]:
         render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
-
-# Add button to insert a new column
-if st.button("➕ Add Product Column"):
-    st.session_state.num_columns += 1
-    st.rerun()

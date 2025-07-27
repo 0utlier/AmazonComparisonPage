@@ -148,7 +148,7 @@ def render_product_column(idx, product, visible_fields):
                         return None
             
                 current_price = extract_price(price)
-                price_md = f"💰{price}<br>_JD_"
+                price_md = f"💰{price}..."
                 st.session_state.product_data[0]["pricing"] = "$4.29"
                 st.session_state.product_data[1]["pricing"] = "$7.59"
 
@@ -166,7 +166,8 @@ def render_product_column(idx, product, visible_fields):
                         diff_color = "green" if diff < 0 else "red" if diff > 0 else "gray"
                         diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
                         diff_amount = f"${abs(diff):.2f}"
-                        diffs.append(f'<span style="color:{diff_color};">[{i + 1}] {diff_sign}{diff_amount}</span>')
+                        diff_append = f'<span style="color:{diff_color};">[{i + 1}] {diff_sign}{diff_amount}</span>'
+                        diffs.append(diff_append)
             
                     if diffs:
                         price_md += "<br>".join(diffs)

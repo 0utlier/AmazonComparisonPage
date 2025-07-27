@@ -33,7 +33,7 @@ if "num_columns" not in st.session_state:
 
 
 def display_field_selector():
-    with st.sidebar.expander("DISPLAY OPTIONS", expanded=False):
+    with st.sidebar.expander("DISPLAY OPTIONS", expanded=True):
         if st.button("✅ Default Options"):
             st.session_state.visible_fields = DEFAULT_FIELDS.copy()
 
@@ -63,6 +63,7 @@ def fetch_amazon_data(url):
     except:
         return {}
 
+
 def render_product_column(idx, product, visible_fields):
     col = st.columns([0.15, 0.55, 0.1, 0.15])  # Label, URL, Amazon, Refresh
 
@@ -87,7 +88,6 @@ def render_product_column(idx, product, visible_fields):
                 st.session_state.product_data.pop(idx)
                 st.session_state.num_columns -= 1
                 st.rerun()
-
 
     # --- URL input with embedded paste button ---
     with col[1]:
@@ -225,7 +225,7 @@ def render_product_column(idx, product, visible_fields):
                 total_pct = pct_4 + pct_5
             
                 if pct_4 or pct_5:
-                    rating_str += f"<br>{total_pct}%<br>5⭐ {pct_5}% - 4⭐ {pct_4}%"
+                    rating_str += f" {total_pct}%<br><br>5⭐ {pct_5}% - 4⭐ {pct_4}%"
             
                 st.markdown(rating_str, unsafe_allow_html=True)
             

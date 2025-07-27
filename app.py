@@ -191,7 +191,7 @@ def render_product_column(idx, product, visible_fields):
                             diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
                             diff_amount = f"${abs(diff):.2f}"
                             diffs.append(
-                                f"<br><span style='color:{diff_color};'>[{i+1}] {diff_sign}{diff_amount}</span>"
+                                f"<br>[{i+1}]<span style='color:{diff_color};'> {diff_sign}{diff_amount}</span>"
                             )
                         except ValueError:
                             continue

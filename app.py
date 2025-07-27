@@ -136,7 +136,7 @@ def render_product_column(idx, product, visible_fields):
                 st.markdown(f"<div style='font-size: 14pt; font-weight: bold'>{title[:150]}{'...' if len(title)>150 else ''}</div>", unsafe_allow_html=True)
 
             elif field == "price":
-                price = product.get("pricing", "N/A")
+                price = product_data.get("pricing", "N/A")
                 if price not in (None, "N/A"):
                     try:
                         current_price = float(str(price).replace("$", "").replace(",", ""))
@@ -147,26 +147,26 @@ def render_product_column(idx, product, visible_fields):
                 
                 price_md = f"**💰{price}**"
                 
-                # Show price difference with other products
-                # if current_price is not None and len(st.session_state.product_data) > 1:
-                #     diffs = []
-                #     for i, other_product in enumerate(st.session_state.product_data):
-                #         if i == idx:
-                #             continue
-                #         other_price = other_product.get("price")
-                #         if other_price in (None, "N/A"):
-                #             continue
-                #         try:
-                #             other_price_val = float(str(other_price).replace("$", "").replace(",", ""))
-                #             diff = current_price - other_price_val
-                #             diff_color = "green" if diff < 0 else "red" if diff > 0 else "gray"
-                #             diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
-                #             diff_amount = f"${abs(diff):.2f}"
-                #             diffs.append(f"<span style='color:{diff_color}'>[{i+1}] {diff_sign}{diff_amount}</span>")
-                #         except ValueError:
-                #             continue
-                #     if diffs:
-                #         price_md += "<br>" + "<br>".join(diffs)
+                Show price difference with other products
+                if current_price is not None and len(st.session_state.product_data) > 1:
+                    diffs = []
+                    for i, other_product in enumerate(st.session_state.product_data):
+                        if i == idx:
+                            continue
+                        other_price = other_product.get("price")
+                        if other_price in (None, "N/A"):
+                            continue
+                        try:
+                            other_price_val = float(str(other_price).replace("$", "").replace(",", ""))
+                            diff = current_price - other_price_val
+                            diff_color = "green" if diff < 0 else "red" if diff > 0 else "gray"
+                            diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
+                            diff_amount = f"${abs(diff):.2f}"
+                            diffs.append(f"<span style='color:{diff_color}'>[{i+1}] {diff_sign}{diff_amount}</span>")
+                        except ValueError:
+                            continue
+                    if diffs:
+                        price_md += "<br>" + "<br>".join(diffs)
                 
                 st.markdown(price_md, unsafe_allow_html=True)
 

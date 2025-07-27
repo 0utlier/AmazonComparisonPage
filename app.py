@@ -151,6 +151,9 @@ def render_product_column(idx, product, visible_fields):
             
                 if current_price is not None and len(st.session_state.product_data) > 1:
                     diffs = []
+                    st.session_state.product_data[1]["pricing"] = "$7.59" # hardcode for debugging
+                    st.session_state.product_data[1]["pricing"] = "$9.55" # hardcode for debugging
+
                     for i, other_product in enumerate(st.session_state.product_data):
                         if i == idx:
                             continue

@@ -202,18 +202,38 @@ def render_product_column(idx, product, visible_fields):
 
             # Rating with 4-star/5-star counts
             elif field == "rating":
-                rating = value or "N/A"
+                product_data = st.session_state.product_data[idx].get("json", {})
+                rating = product_data.get("average_rating", "N/A")
+            
+                # Get and format count
+                raw_count = product_data.get("total_reviews")
+                if isinstance(raw_count, int):
+                    if raw_count < 100:
+                        count_display = str(raw_count)
+                    else:
+                        rounded = (raw_count // 100) * 100
+                        count_display = f"{rounded}+"
+                else:
+                    count_display = "N/A"
+            
+                # Base rating line
+                rating_str = f"⭐ {rating} [👤 {count_display}]"
+            
+                # Try to extract 4 and 5-star percentages
                 breakdown = product_data.get("reviews", [])
-                total_reviews = product_data.get("total_reviews", "N/A")
+                pct_4 = pct_5 = 0
+                for entry in breakdown:
+                    if str(entry.get("stars")) == "4":
+                        pct_4 = int(entry.get("percent", 0))
+                    elif str(entry.get("stars")) == "5":
+                        pct_5 = int(entry.get("percent", 0))
+            
+                total_pct = pct_4 + pct_5
+                if pct_4 or pct_5:
+                    rating_str += f" ({pct_4}% ⭐, {pct_5}% ⭐ - {total_pct}%)"
+            
+                st.markdown(rating_str)
 
-                breakdown_md = ""
-                for b in breakdown:
-                    stars = b.get("stars")
-                    count = b.get("count")
-                    if stars in [4, 5]:
-                        breakdown_md += f"<br>🌟 {stars} star: {count}"
-
-                st.markdown(f"⭐ {rating} [👤 {total_reviews}]{breakdown_md}", unsafe_allow_html=True)
 
             # Image gallery (1 product at a time with expand)
             elif field == "imageGallery":

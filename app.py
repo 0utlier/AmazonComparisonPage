@@ -152,9 +152,6 @@ def render_product_column(idx, product, visible_fields):
             
                 if current_price is not None and len(st.session_state.product_data) > 1:
                     diffs = []
-                    st.session_state.product_data[0]["pricing"] = "$4.29"
-                    st.session_state.product_data[1]["pricing"] = "$7.59"
-
                     for i, other_product in enumerate(st.session_state.product_data):
                         if i == idx:
                             continue
@@ -167,12 +164,14 @@ def render_product_column(idx, product, visible_fields):
                         diff_color = "green" if diff < 0 else "red" if diff > 0 else "gray"
                         diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
                         diff_amount = f"${abs(diff):.2f}"
+                        # ✅ Use real straight quotes here
                         diffs.append(f"<span style='color:{diff_color};'>[{i + 1}] {diff_sign}{diff_amount}</span>")
             
                     if diffs:
-                        price_md += "<br>" + "<br>".join(diffs)
+                        price_md += "<br />" + "<br />".join(diffs)
             
                 st.markdown(price_md, unsafe_allow_html=True)
+
 
 
 

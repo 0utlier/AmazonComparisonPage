@@ -146,17 +146,11 @@ def render_product_column(idx, product, visible_fields):
             #     st.markdown(f"⭐ {rating} [👤 {count}]")
 
             elif field == "rating":
-                reviews = product_data.get("reviews", [])
-                if reviews:
-                    # Assuming you want to get the average rating from the first review or another calculation
-                    rating = reviews[0].get("stars", "N/A")
-                    count = len(reviews)  # Or use product_data.get("total_reviews", 0) to get the total review count
-                else:
-                    rating = "N/A"
-                    count = "N/A"
+                # Fetch the average rating and total reviews directly from the product data
+                rating = product_data.get("average_rating", "N/A")
+                count = product_data.get("total_reviews", "N/A")
                 st.markdown(f"⭐ {rating} [👤 {count}]")
-
-
+            
             elif field == "imageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:

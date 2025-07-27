@@ -139,45 +139,34 @@ def render_product_column(idx, product, visible_fields):
             #//==================================================================================================================================================================================
 
             elif field == "price":
-                price = product_data.get("pricing", "N/A")
-            
                 def extract_price(p):
                     try:
                         return float(str(p).replace("$", "").replace(",", ""))
                     except (ValueError, TypeError):
                         return None
             
+                price = product_data.get("pricing", "N/A")
                 current_price = extract_price(price)
-                price_md = f"💰{price}..."
-
+                price_md = f"**💰{price}**"
+            
                 if current_price is not None and len(st.session_state.product_data) > 1:
-                    st.session_state.product_data[0]["pricing"] = "$4.59" # hardcode for debugging
-                    st.session_state.product_data[1]["pricing"] = "$7.59" # hardcode for debugging
-                    # st.session_state.product_data[2]["pricing"] = "$1.59" # hardcode for debugging
-                    # st.session_state.product_data[3]["pricing"] = "$9.59" # hardcode for debugging
                     diffs = []
                     for i, other_product in enumerate(st.session_state.product_data):
                         if i == idx:
                             continue
-                        other_price_raw = other_product.get("pricing", "N/A")
-                        other_price_val = extract_price(other_price_raw)
+                        other_price = other_product.get("pricing", "N/A")
+                        other_price_val = extract_price(other_price)
                         if other_price_val is None:
                             continue
-            
                         diff = current_price - other_price_val
-                        diff_color = "green" if diff < 0 else "red" if diff > 0 else "gray"
-                        diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
-                        diff_amount = f"${abs(diff):.2f}"
-                        diff_append = f'<span style="color:{diff_color};">[{i + 1}] {diff_sign}{diff_amount}</span>'
-                        diffs.append(diff_append)
-            
+                        color = "green" if diff < 0 else "red" if diff > 0 else "gray"
+                        sign = "+" if diff > 0 else "-" if diff < 0 else "±"
+                        amount = f"${abs(diff):.2f}"
+                        diffs.append(f"<span style='color:{color};'>[{i+1}] {sign}{amount}</span>")
                     if diffs:
-                        price_md += "<br>".join(diffs)
+                        price_md += "<br>" + "<br>".join(diffs)
             
                 st.markdown(price_md, unsafe_allow_html=True)
-
-
-
 
 
             #//==================================================================================================================================================================================

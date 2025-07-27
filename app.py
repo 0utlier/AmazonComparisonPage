@@ -152,22 +152,27 @@ def render_product_column(idx, product, visible_fields):
                     for i, other_product in enumerate(st.session_state.product_data):
                         if i == idx:
                             continue
-                        other_price_raw = other_product.get("pricing", "N/A")
+                        other_json = other_product.get("json", {})
+                        other_price_raw = other_json.get("pricing", "N/A")
                         other_price_val = extract_price(other_price_raw)
                         if other_price_val is None:
                             continue
-            
+                    
                         diff = current_price - other_price_val
                         diff_color = "green" if diff < 0 else "red" if diff > 0 else "gray"
                         diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
                         diff_amount = f"${abs(diff):.2f}"
                         diffs.append(f"<span style='color:{diff_color}'>[{i+1}] {diff_sign}{diff_amount}</span>")
-            
+
                     if diffs:
                         price_md += "<br>" + "<br>".join(diffs)
             
                 st.markdown(price_md, unsafe_allow_html=True)
 
+
+
+
+            
 
             elif field == "rating":
                 rating = product_data.get("average_rating", "N/A")

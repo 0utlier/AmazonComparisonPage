@@ -27,9 +27,6 @@ if "visible_fields" not in st.session_state:
 if "product_data" not in st.session_state:
     st.session_state.product_data = []
 
-if "num_columns" not in st.session_state:
-    st.session_state.num_columns = 2
-
 
 def display_field_selector():
     with st.sidebar.expander("🧰 DISPLAY OPTIONS", expanded=True):
@@ -166,8 +163,9 @@ if st.button("➕ Add Product Column", help="Add a new Amazon product for compar
 
 # Render product columns if there are any
 if st.session_state.num_columns > 0:
-    cols = st.columns(st.session_state.num_columns)
-    for i in range(st.session_state.num_columns):
+    num_cols = len(st.session_state.product_urls)
+    cols = st.columns(num_cols)
+    for i in range(num_cols):
         with cols[i]:
-            render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
+                render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
 

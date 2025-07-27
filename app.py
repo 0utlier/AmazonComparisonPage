@@ -165,7 +165,7 @@ def render_product_column(idx, product, visible_fields):
                         diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
                         diff_amount = f"${abs(diff):.2f}"
                         # ✅ Use real straight quotes here
-                        diffs.append(f"<span style='color:{diff_color};'>[{i + 1}] {diff_sign}{diff_amount}</span>")
+                        diffs.append(f"<span style=′color:{diff_color};′>[{i + 1}] {diff_sign}{diff_amount}</span>")
             
                     if diffs:
                         price_md += "<br />" + "<br />".join(diffs)

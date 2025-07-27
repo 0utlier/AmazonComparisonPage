@@ -89,7 +89,7 @@ def render_product_column(idx, product, visible_fields):
                     st.session_state.num_columns -= 1
                     st.rerun()
 
-# --- URL input with embedded buttons (left, X, right) ---
+    # --- URL input with embedded buttons (left, X, right) ---
     with col[1]:
         url_input_key = f"url_{idx}"
         default_url = product.get("url", "")
@@ -105,7 +105,7 @@ def render_product_column(idx, product, visible_fields):
             )
     
         with input_cols[1]:
-            if st.button("⬅️", key=f"move_left_{idx}", help="Move Left"):
+            if st.button(f"⬅️ Move Left {idx}", key=f"move_left_{idx}", help="Move Left"):
                 if idx > 0:
                     st.session_state.product_data[idx - 1], st.session_state.product_data[idx] = (
                         st.session_state.product_data[idx],
@@ -114,13 +114,13 @@ def render_product_column(idx, product, visible_fields):
                     st.rerun()
     
         with input_cols[2]:
-            if st.button("❌", key=f"remove_product_{idx}", help="Remove Product"):
+            if st.button(f"❌ Remove Product {idx}", key=f"remove_product_{idx}", help="Remove Product"):
                 st.session_state.product_data.pop(idx)
                 st.session_state.num_columns -= 1
                 st.rerun()
     
         with input_cols[3]:
-            if st.button("➡️", key=f"move_right_{idx}", help="Move Right"):
+            if st.button(f"➡️ Move Right {idx}", key=f"move_right_{idx}", help="Move Right"):
                 if idx < st.session_state.num_columns - 1:
                     st.session_state.product_data[idx + 1], st.session_state.product_data[idx] = (
                         st.session_state.product_data[idx],
@@ -129,6 +129,7 @@ def render_product_column(idx, product, visible_fields):
                     st.rerun()
     
         st.session_state.product_data[idx]["url"] = url
+
 
 
     # --- Amazon link button ---

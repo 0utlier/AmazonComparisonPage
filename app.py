@@ -65,29 +65,32 @@ def fetch_amazon_data(url):
 def render_product_column(idx, product, visible_fields):
     col = st.columns([0.7, 5.3, 0.5, 0.5])  # Label, URL, Amazon, Refresh
 
-    # --- Column label with dropdown ---
+# --- Column label and aligned dropdown ---
     with col[0]:
-        with st.container():
-            st.markdown(f"<div style='padding-top: 10px; font-weight: bold'>[{idx + 1}]</div>", unsafe_allow_html=True)
-            with st.popover(f"<X>"):
+        input_bar = st.columns([1, 1])  # split label and button
+        with input_bar[0]:
+            st.markdown(f"<div style='padding-top: 0.6em; font-weight: bold'>[{idx + 1}]</div>", unsafe_allow_html=True)
+        with input_bar[1]:
+            with st.popover("⋯", use_container_width=True):  # icon for menu
                 if idx > 0 and st.button("⬅️ Move Left", key=f"move_left_{idx}"):
                     st.session_state.product_data[idx - 1], st.session_state.product_data[idx] = (
                         st.session_state.product_data[idx],
                         st.session_state.product_data[idx - 1],
                     )
                     st.rerun()
-
+    
                 if idx < st.session_state.num_columns - 1 and st.button("➡️ Move Right", key=f"move_right_{idx}"):
                     st.session_state.product_data[idx + 1], st.session_state.product_data[idx] = (
                         st.session_state.product_data[idx],
                         st.session_state.product_data[idx + 1],
                     )
                     st.rerun()
-
+    
                 if st.button("🗑️ Remove Product", key=f"remove_product_{idx}"):
                     st.session_state.product_data.pop(idx)
                     st.session_state.num_columns -= 1
                     st.rerun()
+
 
     # --- URL input with embedded paste button ---
     with col[1]:
@@ -153,13 +156,7 @@ def render_product_column(idx, product, visible_fields):
                 
                 count = product_data.get("total_reviews", "N/A")
                 st.markdown(f"⭐ {rating} [👤 {count}]")
-               
-           # elif field == "rating":
-           #      # Fetch the average rating and total reviews directly from the product data
-           #      rating = product_data.get("average_rating", "N/A")
-           #      count = product_data.get("total_reviews", "N/A")
-           #      st.markdown(f"⭐ {rating} [👤 {count}]")
-            
+
             elif field == "imageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:

@@ -152,7 +152,7 @@ def render_product_column(idx, product, visible_fields):
 
                 if current_price is not None and len(st.session_state.product_data) > 1:
                     st.session_state.product_data[0]["pricing"] = "$4.59" # hardcode for debugging
-                    # st.session_state.product_data[1]["pricing"] = "$7.59" # hardcode for debugging
+                    st.session_state.product_data[1]["pricing"] = "$7.59" # hardcode for debugging
                     # st.session_state.product_data[2]["pricing"] = "$1.59" # hardcode for debugging
                     # st.session_state.product_data[3]["pricing"] = "$9.59" # hardcode for debugging
                     diffs = []
@@ -174,7 +174,7 @@ def render_product_column(idx, product, visible_fields):
                     if diffs:
                         price_md += "<br>".join(diffs)
             
-                st.markdown(diff_append, unsafe_allow_html=True) # price_md
+                st.markdown(price_md, unsafe_allow_html=True)
 
 
 

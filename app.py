@@ -1,5 +1,6 @@
 # v0.52
 import streamlit as st
+import streamlit.components.v1 as components
 import requests
 from urllib.parse import quote_plus
 
@@ -258,3 +259,90 @@ for i in range(st.session_state.num_columns):
         st.session_state.product_data.append({"url": ""})
     with cols[i]:
         render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
+
+# ----------- RIGHT CLICK TO DEV -----------
+
+components.html("""
+<style>
+#devbar {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #333;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-family: sans-serif;
+  font-size: 14px;
+  z-index: 9999;
+  display: none;
+}
+#devpanel {
+  position: fixed;
+  top: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  background: white;
+  padding: 15px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+  font-family: sans-serif;
+  display: none;
+  z-index: 9999;
+}
+#devpanel textarea {
+  width: 100%;
+  height: 60px;
+  margin-bottom: 8px;
+}
+#devpanel input {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 6px;
+}
+</style>
+
+<div id="devbar">Right Click to Dev</div>
+<div id="devpanel">
+  <textarea id="devMessage" placeholder="Describe what you'd like to suggest..."></textarea>
+  <input id="devEmail" type="email" placeholder="Your email">
+  <button onclick="sendDev()">Send</button>
+  <button onclick="cancelDev()">Cancel</button>
+</div>
+
+<script>
+document.addEventListener('contextmenu', function(e) {
+  e.preventDefault();
+  document.getElementById('devbar').style.display = 'block';
+});
+
+document.getElementById('devbar').addEventListener('click', function() {
+  this.style.display = 'none';
+  document.getElementById('devpanel').style.display = 'block';
+});
+
+function sendDev() {
+  const msg = document.getElementById('devMessage').value;
+  const email = document.getElementById('devEmail').value;
+  if (!msg || !email) {
+    alert("Please fill in both the message and email.");
+    return;
+  }
+
+  const pageInfo = "Page element context: " + document.activeElement.outerHTML;
+  const body = encodeURIComponent(msg + "\\n\\n---\\n" + pageInfo);
+  const mailto = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=Dev Feedback&body=${body}`;
+  window.open(mailto, '_blank');
+  document.getElementById('devpanel').style.display = 'none';
+}
+
+function cancelDev() {
+  if (confirm("Are you sure you want to cancel?")) {
+    document.getElementById('devpanel').style.display = 'none';
+  }
+}
+</script>
+""", height=0)
+

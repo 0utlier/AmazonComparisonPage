@@ -140,12 +140,22 @@ def render_product_column(idx, product, visible_fields):
                 price = product_data.get("pricing", "N/A")
                 st.markdown(f"💰 **{price}**")
 
+            # elif field == "rating":
+            #     rating = product_data.get("reviews", [{}])[0].get("rating", "N/A")
+            #     count = product_data.get("reviews", [{}])[0].get("count", "N/A")
+            #     st.markdown(f"⭐ {rating} [👤 {count}]")
+
             elif field == "rating":
-                rating = product_data.get("reviews", [{}])[0].get("rating", "N/A")
-                count = product_data.get("reviews", [{}])[0].get("count", "N/A")
+                reviews = product_data.get("reviews", [])
+                if reviews:
+                    rating = reviews[0].get("rating", "N/A")
+                    count = reviews[0].get("count", "N/A")
+                else:
+                    rating = "N/A"
+                    count = "N/A"
                 st.markdown(f"⭐ {rating} [👤 {count}]")
 
-            elif field == "imageGallery":
+elif field == "imageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
                     st.image(imgs, width=200, caption=None, use_column_width="auto")

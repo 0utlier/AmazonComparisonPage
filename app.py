@@ -137,7 +137,7 @@ def render_product_column(idx, product, visible_fields):
                 st.markdown(f"<div style='font-size: 14pt; font-weight: bold'>{title[:150]}{'...' if len(title)>150 else ''}</div>", unsafe_allow_html=True)
 
             elif field == "price":
-                price = product_data.get("pricing", {}).get("price", "N/A")
+                price = product_data.get("pricing", {}).get("pricing", "N/A")
                 st.markdown(f"💰 **{price}**")
 
             elif field == "rating":

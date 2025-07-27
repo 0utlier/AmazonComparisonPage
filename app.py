@@ -89,12 +89,11 @@ def render_product_column(idx, product, visible_fields):
                     st.session_state.num_columns -= 1
                     st.rerun()
 
-    # --- URL input with embedded buttons (left, X, right) ---
+    # --- URL input with embedded paste button ---
     with col[1]:
         url_input_key = f"url_{idx}"
         default_url = product.get("url", "")
-        input_cols = st.columns([8, 1, 1, 1])  # Adjust columns to add space for buttons
-    
+        input_cols = st.columns([8, 1])
         with input_cols[0]:
             url = st.text_input(
                 "",
@@ -103,40 +102,13 @@ def render_product_column(idx, product, visible_fields):
                 key=url_input_key,
                 label_visibility="collapsed"
             )
-    
-        # Ensuring unique keys for each button:
         with input_cols[1]:
-            move_left_key = f"move_left_{idx}"  # Ensure unique key for move left button
-            if st.button(f"⬅️ Move Left {idx}", key=move_left_key, help="Move Left"):
-                if idx > 0:
-                    st.session_state.product_data[idx - 1], st.session_state.product_data[idx] = (
-                        st.session_state.product_data[idx],
-                        st.session_state.product_data[idx - 1],
-                    )
-                    st.rerun()
-    
-        with input_cols[2]:
-            remove_product_key = f"remove_product_{idx}_button"  # Adding suffix to make it unique
-            if st.button(f"❌ Remove Product {idx}", key=remove_product_key, help="Remove Product"):
-                st.session_state.product_data.pop(idx)
-                st.session_state.num_columns -= 1
+            if st.button("📋", key=f"paste_{idx}", help="Paste from clipboard"):
+                pasted = st.clipboard_get()
+                st.session_state.product_data[idx]["url"] = pasted
                 st.rerun()
-    
-        with input_cols[3]:
-            move_right_key = f"move_right_{idx}_button"  # Adding suffix to make it unique
-            if st.button(f"➡️ Move Right {idx}", key=move_right_key, help="Move Right"):
-                if idx < st.session_state.num_columns - 1:
-                    st.session_state.product_data[idx + 1], st.session_state.product_data[idx] = (
-                        st.session_state.product_data[idx],
-                        st.session_state.product_data[idx + 1],
-                    )
-                    st.rerun()
-    
+
         st.session_state.product_data[idx]["url"] = url
-
-
-
-
 
     # --- Amazon link button ---
     with col[2]:
@@ -181,7 +153,13 @@ def render_product_column(idx, product, visible_fields):
                 
                 count = product_data.get("total_reviews", "N/A")
                 st.markdown(f"⭐ {rating} [👤 {count}]")
-
+               
+           # elif field == "rating":
+           #      # Fetch the average rating and total reviews directly from the product data
+           #      rating = product_data.get("average_rating", "N/A")
+           #      count = product_data.get("total_reviews", "N/A")
+           #      st.markdown(f"⭐ {rating} [👤 {count}]")
+            
             elif field == "imageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:

@@ -275,12 +275,12 @@ with button_cols[1]:
         
         
         
-        cols = st.columns(st.session_state.num_columns)
-        
-        for i in range(st.session_state.num_columns):
-            if i >= len(st.session_state.product_data):
-                st.session_state.product_data.append({"url": ""})
-            with cols[i]:
-                render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
+    cols = st.columns(st.session_state.num_columns)
+    
+    for i in range(st.session_state.num_columns):
+        if i >= len(st.session_state.product_data):
+            st.session_state.product_data.append({"url": ""})
+        with cols[i]:
+            render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
         
 

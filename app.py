@@ -1,3 +1,4 @@
+# v0.51
 import streamlit as st
 import requests
 from urllib.parse import quote_plus
@@ -165,32 +166,38 @@ def render_product_column(idx, product, visible_fields):
 
             # Price
             elif field == "price":
-                def extract_price(p):
+                price = product_data.get("pricing", "N/A")
+                current_price = None
+                if price not in (None, "N/A"):
                     try:
-                        return float(str(p).replace("$", "").replace(",", ""))
-                    except:
-                        return None
-
-                current_price = extract_price(value)
-                price_md = f"**💰{value or 'N/A'}**"
-
-                if current_price is not None:
+                        current_price = float(str(price).replace("$", "").replace(",", ""))
+                    except ValueError:
+                        pass
+            
+                price_md = f"<div>💰<strong>{price}</strong>"
+            
+                if current_price is not None and len(st.session_state.product_data) > 1:
                     diffs = []
-                    for i, other_val in enumerate(all_values):
+                    for i, other_product in enumerate(st.session_state.product_data):
                         if i == idx:
                             continue
-                        other_price = extract_price(other_val)
-                        if other_price is None:
+                        other_price = other_product.get("pricing")
+                        if other_price in (None, "N/A"):
                             continue
-                        diff = current_price - other_price
-                        color = "green" if diff < 0 else "red" if diff > 0 else "gray"
-                        sign = "+" if diff > 0 else "-" if diff < 0 else "±"
-                        amount = f"${abs(diff):.2f}"
-                        diffs.append(f"<span style='color:{color};'>[{i + 1}] {sign}{amount}</span>")
-
-                    if diffs:
-                        price_md += "<br>" + "<br>".join(diffs)
-
+                        try:
+                            other_price_val = float(str(other_price).replace("$", "").replace(",", ""))
+                            diff = current_price - other_price_val
+                            diff_color = "green" if diff < 0 else "red" if diff > 0 else "gray"
+                            diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
+                            diff_amount = f"${abs(diff):.2f}"
+                            diffs.append(
+                                f"<br><span style='color:{diff_color};'>[{i+1}] {diff_sign}{diff_amount}</span>"
+                            )
+                        except ValueError:
+                            continue
+                    price_md += "".join(diffs)
+            
+                price_md += "</div>"
                 st.markdown(price_md, unsafe_allow_html=True)
 
             # Rating with 4-star/5-star counts

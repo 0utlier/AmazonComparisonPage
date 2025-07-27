@@ -155,7 +155,7 @@ def render_product_column(idx, product, visible_fields):
                     count = "N/A"
                 st.markdown(f"⭐ {rating} [👤 {count}]")
 
-elif field == "imageGallery":
+            elif field == "imageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
                     st.image(imgs, width=200, caption=None, use_column_width="auto")

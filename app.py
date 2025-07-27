@@ -32,7 +32,7 @@ if "num_columns" not in st.session_state:
 
 
 def display_field_selector():
-    with st.sidebar.expander("🧰 DISPLAY OPTIONS", expanded=True):
+    with st.sidebar.expander("DISPLAY OPTIONS", expanded=True):
         if st.button("✅ Default Options"):
             st.session_state.visible_fields = DEFAULT_FIELDS.copy()
 
@@ -67,29 +67,25 @@ def render_product_column(idx, product, visible_fields):
 
 # --- Column label and aligned dropdown ---
     with col[0]:
-        input_bar = st.columns([1, 1])  # split label and button
-        with input_bar[0]:
-            st.markdown(f"<div style='padding-top: 0.6em; font-weight: bold'>[{idx + 1}]</div>", unsafe_allow_html=True)
-        with input_bar[1]:
-            with st.popover("<x>", use_container_width=True):  # icon for menu
-                if idx > 0 and st.button("⬅️ Move Left", key=f"move_left_{idx}"):
-                    st.session_state.product_data[idx - 1], st.session_state.product_data[idx] = (
-                        st.session_state.product_data[idx],
-                        st.session_state.product_data[idx - 1],
-                    )
-                    st.rerun()
-    
-                if idx < st.session_state.num_columns - 1 and st.button("➡️ Move Right", key=f"move_right_{idx}"):
-                    st.session_state.product_data[idx + 1], st.session_state.product_data[idx] = (
-                        st.session_state.product_data[idx],
-                        st.session_state.product_data[idx + 1],
-                    )
-                    st.rerun()
-    
-                if st.button("🗑️ Remove Product", key=f"remove_product_{idx}"):
-                    st.session_state.product_data.pop(idx)
-                    st.session_state.num_columns -= 1
-                    st.rerun()
+        with st.popover(f"[{idx + 1}]", use_container_width=True):
+            if idx > 0 and st.button("⬅️ Move Left", key=f"move_left_{idx}"):
+                st.session_state.product_data[idx - 1], st.session_state.product_data[idx] = (
+                    st.session_state.product_data[idx],
+                    st.session_state.product_data[idx - 1],
+                )
+                st.rerun()
+
+            if idx < st.session_state.num_columns - 1 and st.button("➡️ Move Right", key=f"move_right_{idx}"):
+                st.session_state.product_data[idx + 1], st.session_state.product_data[idx] = (
+                    st.session_state.product_data[idx],
+                    st.session_state.product_data[idx + 1],
+                )
+                st.rerun()
+
+            if st.button("🗑️ Remove Product", key=f"remove_product_{idx}"):
+                st.session_state.product_data.pop(idx)
+                st.session_state.num_columns -= 1
+                st.rerun()
 
 
     # --- URL input with embedded paste button ---

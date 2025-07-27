@@ -122,21 +122,21 @@ def render_product_column(idx, product, visible_fields):
             st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
             st.rerun()
 
-    # --- Load data if needed ---
+        # --- Load data if needed ---
     if url:
         if "json" not in product:
-            with st.spinner("Loading... 🔄 A"):
+            with st.markdown("<div style='font-size:16px; animation: pulse 1.5s infinite;'>🔃 Fetching details...</div>", unsafe_allow_html=True):
                 st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
 
         product_data = st.session_state.product_data[idx].get("json", {})
+        col_heights = st.session_state.get("field_heights", {})
 
         for field in visible_fields:
+            content = ""
             if field == "title":
                 title = product_data.get("name", "N/A")
-                st.markdown(f"<div style='font-size: 14pt; font-weight: bold'>{title[:150]}{'...' if len(title)>150 else ''}</div>", unsafe_allow_html=True)
-
-            #//==================================================================================================================================================================================
-            #//==================================================================================================================================================================================
+                short_title = f"{title[:150]}{'...' if len(title)>150 else ''}"
+                content = f"<div style='font-size: 14pt; font-weight: bold'>{short_title}</div>"
 
             elif field == "price":
                 def extract_price(p):
@@ -144,62 +144,65 @@ def render_product_column(idx, product, visible_fields):
                         return float(str(p).replace("$", "").replace(",", ""))
                     except (ValueError, TypeError):
                         return None
-            
+
                 price = product_data.get("pricing", "N/A")
                 current_price = extract_price(price)
-                price_md = f"**💰{price}**"
-            
+                price_md = f"<strong>💰{price}</strong>"
+
                 if current_price is not None and len(st.session_state.product_data) > 1:
                     diffs = []
-                    st.session_state.product_data[1]["pricing"] = "$7.59" # hardcode for debugging
-                    st.session_state.product_data[1]["pricing"] = "$9.55" # hardcode for debugging
-
                     for i, other_product in enumerate(st.session_state.product_data):
                         if i == idx:
                             continue
                         other_price = other_product.get("pricing", "N/A")
-                        other_price_val = extract_price(other_price)
-                        if other_price_val is None:
+                        other_val = extract_price(other_price)
+                        if other_val is None:
                             continue
-                        diff = current_price - other_price_val
+                        diff = current_price - other_val
                         color = "green" if diff < 0 else "red" if diff > 0 else "gray"
                         sign = "+" if diff > 0 else "-" if diff < 0 else "±"
                         amount = f"${abs(diff):.2f}"
                         diffs.append(f"<span style='color:{color};'>[{i+1}] {sign}{amount}</span>")
                     if diffs:
                         price_md += "<br>" + "<br>".join(diffs)
-            
-                st.markdown(price_md, unsafe_allow_html=True)
-
-
-            #//==================================================================================================================================================================================
-            #//==================================================================================================================================================================================
-
+                content = price_md
 
             elif field == "rating":
                 rating = product_data.get("average_rating", "N/A")
-                
-                # Fallback in case average_rating is missing or not correctly set
                 if rating == "N/A":
                     reviews = product_data.get("reviews", [])
                     if reviews:
                         rating = reviews[0].get("stars", "N/A")
-                    else:
-                        rating = "N/A"
-                
                 count = product_data.get("total_reviews", "N/A")
-                st.markdown(f"⭐ {rating} [👤 {count}]")
+                content = f"⭐ {rating} [👤 {count}]"
 
             elif field == "imageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
-                    st.image(imgs, width=200, caption=None, use_container_width="True")
+                    st.image(imgs, width=200, use_container_width=True)
                 else:
-                    st.markdown("🖼️ No images found")
+                    content = "🖼️ No images found"
 
             else:
                 val = product_data.get(field, "N/A")
-                st.write(f"**{field.capitalize()}**: {val}")
+                content = f"<strong>{field.capitalize()}</strong>: {val}"
+
+            # --- Calculate max height for this field across products ---
+            col_heights.setdefault(field, [])
+            col_heights[field].append(len(content.split("<br>")) + content.count("\n"))
+
+            # --- Store the max line count for each field ---
+            max_lines = max(col_heights[field])
+            st.session_state.field_heights = col_heights  # Persist
+
+            # --- Pad short rows for alignment ---
+            line_count = content.count("<br>") + content.count("\n") + 1
+            pad_lines = max_lines - line_count
+            pad_html = "<br>" * pad_lines if pad_lines > 0 else ""
+
+            if field != "imageGallery":
+                st.markdown(content + pad_html, unsafe_allow_html=True)
+
 
 
 # ----------- MAIN -----------

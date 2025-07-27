@@ -225,19 +225,31 @@ def render_product_column(idx, product, visible_fields):
                 total_pct = pct_4 + pct_5
             
                 if pct_4 or pct_5:
-                    rating_str += f" ({pct_4}% ⭐, {pct_5}% ⭐ - {total_pct}%)"
+                    rating_str += f" ({pct_5}% 5⭐, {pct_4}% 4⭐ - {total_pct}%)"
             
                 st.markdown(rating_str)
 
             # Image gallery (1 product at a time with expand)
+            # elif field == "imageGallery":
+            #     images = value
+            #     if images:
+            #         for i, img_url in enumerate(images[:1]):  # only first image shown
+            #             with st.expander("🖼️ Click to enlarge"):
+            #                 st.image(img_url, use_container_width=True)
+            #     else:
+            #         st.markdown("🖼️ No images found")
+
+
             elif field == "imageGallery":
-                images = value
-                if images:
-                    for i, img_url in enumerate(images[:1]):  # only first image shown
-                        with st.expander("🖼️ Click to enlarge"):
-                            st.image(img_url, use_container_width=True)
+                imgs = product_data.get("images", [])
+                if imgs:
+                    st.image(imgs, width=200, caption=None, use_container_width="True")
                 else:
                     st.markdown("🖼️ No images found")
+
+            else:
+                val = product_data.get(field, "N/A")
+                st.write(f"**{field.capitalize()}**: {val}")
 
             # Generic field
             else:

@@ -148,8 +148,8 @@ def render_product_column(idx, product, visible_fields):
                         return None
             
                 current_price = extract_price(price)
-                price_md = f"💰{price}<br>"
-                st.session_state.product_data[2]["pricing"] = "$4.29"
+                price_md = f"💰{price}<br>_JD_"
+                st.session_state.product_data[0]["pricing"] = "$4.29"
                 st.session_state.product_data[1]["pricing"] = "$7.59"
 
                 if current_price is not None and len(st.session_state.product_data) > 1:
@@ -169,7 +169,7 @@ def render_product_column(idx, product, visible_fields):
                         diffs.append(f"<span style='color:{diff_color};'>[{i + 1}] {diff_sign}{diff_amount}</span>")
             
                     if diffs:
-                        price_md += "__".join(diffs)
+                        price_md += "_ME_".join(diffs)
             
                 st.markdown(price_md, unsafe_allow_html=True)
 

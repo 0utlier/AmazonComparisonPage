@@ -3,13 +3,8 @@ import streamlit as st
 import requests
 from urllib.parse import quote_plus
 
+# ✅ Sidebar starts collapsed, but user can expand it
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
-
-st.markdown("""
-    <style>
-        [data-testid="stSidebar"] {display: none;}
-    </style>
-""", unsafe_allow_html=True)
 
 st.title("🛍️ Amazon Product Comparison")
 
@@ -27,6 +22,7 @@ ALL_FIELDS = [
     "features",
     "categories",
 ]
+
 
 if "visible_fields" not in st.session_state:
     st.session_state.visible_fields = DEFAULT_FIELDS.copy()
@@ -109,8 +105,8 @@ def render_product_column(idx, product, visible_fields):
             )
 
         with input_cols[1]:
-            if st.button("📋", key=f"paste_{idx}", help="Paste from clipboard (manual paste required)"):
-                st.warning("📋 Clipboard access not supported. Please paste manually.")
+            if st.button("📋", key=f"paste_{idx}", help="Paste from clipboard"):
+                st.info("📋 Clipboard access not supported in Streamlit. Please paste manually into the text box.")
 
         # Refresh only if URL changed
         if url != product.get("url"):

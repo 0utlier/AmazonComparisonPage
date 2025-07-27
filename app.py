@@ -248,7 +248,7 @@ def render_product_column(idx, product, visible_fields):
 # ----------- MAIN -----------
 display_field_selector()
 
-button_cols = st.columns([1, 1])
+button_cols = st.columns([0.5, 0.5])
 
 with button_cols[0]:
     if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
@@ -260,6 +260,16 @@ with button_cols[1]:
         components.html(
             """
             <style>
+            #dev-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.2);
+                z-index: 9999;
+                cursor: crosshair;
+            }
             #dev-banner {
                 position: fixed;
                 bottom: 20px;
@@ -270,36 +280,37 @@ with button_cols[1]:
                 border-radius: 8px;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                 font-family: sans-serif;
-                z-index: 9999;
+                z-index: 10000;
             }
             </style>
-
-            <div id="dev-banner">🛠 Click any element to send feedback...</div>
-
+    
+            <div id="dev-overlay"></div>
+            <div id="dev-banner">🛠 Dev Mode: Click any element to give feedback...</div>
+    
             <script>
+            const overlay = document.getElementById("dev-overlay");
             const banner = document.getElementById("dev-banner");
-
-            function handleClick(e) {
+    
+            overlay.addEventListener("click", function(e) {
                 e.preventDefault();
                 e.stopPropagation();
-
-                const element = e.target;
-                const outerHTML = element.outerHTML;
-                const body = encodeURIComponent("I noticed an issue with this element:\\n\\n" + outerHTML);
+                let el = document.elementFromPoint(e.clientX, e.clientY);
+                if (!el) return;
+    
+                const outerHTML = el.outerHTML;
+                const body = encodeURIComponent("Feedback on element:\\n\\n" + outerHTML);
                 const gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1&to=youremail@example.com&su=Dev Feedback&body=" + body;
-                
+    
                 window.open(gmailUrl, "_blank");
+    
+                overlay.remove();
                 banner.remove();
-                document.removeEventListener("click", handleClick, true);
-            }
-
-            setTimeout(() => {
-                document.addEventListener("click", handleClick, true);
-            }, 100);
+            }, { once: true });
             </script>
             """,
             height=0
         )
+
 
 cols = st.columns(st.session_state.num_columns)
 

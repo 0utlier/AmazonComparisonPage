@@ -205,7 +205,7 @@ def render_product_column(idx, product, visible_fields):
                 product_data = st.session_state.product_data[idx].get("json", {})
                 rating = product_data.get("average_rating", "N/A")
             
-                # Get and format count
+                # Format total review count
                 raw_count = product_data.get("total_reviews")
                 if isinstance(raw_count, int):
                     if raw_count < 100:
@@ -216,24 +216,18 @@ def render_product_column(idx, product, visible_fields):
                 else:
                     count_display = "N/A"
             
-                # Base rating line
+                # Start rating line
                 rating_str = f"⭐ {rating} [👤 {count_display}]"
             
-                # Try to extract 4 and 5-star percentages
-                breakdown = product_data.get("reviews", [])
-                pct_4 = pct_5 = 0
-                for entry in breakdown:
-                    if str(entry.get("stars")) == "4":
-                        pct_4 = int(entry.get("percent", 0))
-                    elif str(entry.get("stars")) == "5":
-                        pct_5 = int(entry.get("percent", 0))
-            
+                # Pull 4-star and 5-star percentages from correct keys
+                pct_4 = int(product_data.get("4_star_percentage", 0))
+                pct_5 = int(product_data.get("5_star_percentage", 0))
                 total_pct = pct_4 + pct_5
+            
                 if pct_4 or pct_5:
                     rating_str += f" ({pct_4}% ⭐, {pct_5}% ⭐ - {total_pct}%)"
             
                 st.markdown(rating_str)
-
 
             # Image gallery (1 product at a time with expand)
             elif field == "imageGallery":

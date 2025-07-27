@@ -255,28 +255,47 @@ if st.button("➕ Add Product Column", help="Add a new Amazon product for compar
 if st.button("🛠 Dev Mode"):
     components.html(
         """
-        <script>
-        alert("Click anywhere on the page to report a UI issue.");
+        <style>
+        #dev-banner {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            font-family: sans-serif;
+            z-index: 9999;
+        }
+        </style>
 
-        document.addEventListener("click", function handler(e) {
+        <div id="dev-banner">🛠 Click any element to send feedback...</div>
+
+        <script>
+        const banner = document.getElementById("dev-banner");
+
+        function handleClick(e) {
             e.preventDefault();
             e.stopPropagation();
 
             const element = e.target;
             const outerHTML = element.outerHTML;
-
             const body = encodeURIComponent("I noticed an issue with this element:\\n\\n" + outerHTML);
-            const url = "https://mail.google.com/mail/?view=cm&fs=1&to=youremail@example.com&su=Dev Feedback&body=" + body;
-            window.open(url, "_blank");
+            const gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1&to=youremail@example.com&su=Dev Feedback&body=" + body;
+            
+            window.open(gmailUrl, "_blank");
+            banner.remove();
+            document.removeEventListener("click", handleClick, true);
+        }
 
-            document.removeEventListener("click", handler, true);
-        }, true);
+        setTimeout(() => {
+            document.addEventListener("click", handleClick, true);
+        }, 100); // delay so the button click doesn't trigger it
         </script>
         """,
-        height=0,
-        scrolling=False
+        height=0
     )
-
 
 cols = st.columns(st.session_state.num_columns)
 

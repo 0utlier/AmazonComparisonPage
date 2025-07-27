@@ -150,7 +150,7 @@ def render_product_column(idx, product, visible_fields):
                 if imgs:
                     # Limit the number of images to display (4-5 per row)
                     img_per_row = 5
-                    rows = [images[i:i+img_per_row] for i in range(0, len(images), img_per_row)]
+                    rows = [imgs[i:i+img_per_row] for i in range(0, len(imgs), img_per_row)]
                     for row in rows:
                         cols = st.columns(len(row))
                         for i, img in enumerate(row):

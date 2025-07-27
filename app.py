@@ -257,152 +257,30 @@ with button_cols[0]:
 
 with button_cols[1]:
     if st.button("🛠 Dev Mode"):
-        components.html(
-            """
-            <style>
-            #dev-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0,0,0,0.2);
-                z-index: 9999;
-                cursor: crosshair;
-            }
-            #dev-banner {
-                position: fixed;
-                bottom: 20px;
-                right: 20px;
-                background: #333;
-                color: white;
-                padding: 10px 15px;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                font-family: sans-serif;
-                z-index: 10000;
-            }
-            </style>
-    
-            <div id="dev-overlay"></div>
-            <div id="dev-banner">🛠 Dev Mode: Click any element to give feedback...</div>
-    
-            <script>
-            const overlay = document.getElementById("dev-overlay");
-            const banner = document.getElementById("dev-banner");
-    
-            overlay.addEventListener("click", function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                let el = document.elementFromPoint(e.clientX, e.clientY);
-                if (!el) return;
-    
-                const outerHTML = el.outerHTML;
-                const body = encodeURIComponent("Feedback on element:\\n\\n" + outerHTML);
-                const gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1&to=youremail@example.com&su=Dev Feedback&body=" + body;
-    
-                window.open(gmailUrl, "_blank");
-    
-                overlay.remove();
-                banner.remove();
-            }, { once: true });
-            </script>
-            """,
-            height=0
-        )
-
-
-cols = st.columns(st.session_state.num_columns)
-
-for i in range(st.session_state.num_columns):
-    if i >= len(st.session_state.product_data):
-        st.session_state.product_data.append({"url": ""})
-    with cols[i]:
-        render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
-
-# ----------- RIGHT CLICK TO DEV -----------
-
-components.html("""
-<style>
-#devbar {
-  position: fixed;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #333;
-  color: white;
-  padding: 6px 12px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-family: sans-serif;
-  font-size: 14px;
-  z-index: 9999;
-  display: none;
-}
-#devpanel {
-  position: fixed;
-  top: 50px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 300px;
-  background: white;
-  padding: 15px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.3);
-  font-family: sans-serif;
-  display: none;
-  z-index: 9999;
-}
-#devpanel textarea {
-  width: 100%;
-  height: 60px;
-  margin-bottom: 8px;
-}
-#devpanel input {
-  width: 100%;
-  margin-bottom: 8px;
-  padding: 6px;
-}
-</style>
-
-<div id="devbar">Right Click to Dev</div>
-<div id="devpanel">
-  <textarea id="devMessage" placeholder="Describe what you'd like to suggest..."></textarea>
-  <input id="devEmail" type="email" placeholder="Your email">
-  <button onclick="sendDev()">Send</button>
-  <button onclick="cancelDev()">Cancel</button>
-</div>
-
-<script>
-document.addEventListener('contextmenu', function(e) {
-  e.preventDefault();
-  document.getElementById('devbar').style.display = 'block';
-});
-
-document.getElementById('devbar').addEventListener('click', function() {
-  this.style.display = 'none';
-  document.getElementById('devpanel').style.display = 'block';
-});
-
-function sendDev() {
-  const msg = document.getElementById('devMessage').value;
-  const email = document.getElementById('devEmail').value;
-  if (!msg || !email) {
-    alert("Please fill in both the message and email.");
-    return;
-  }
-
-  const pageInfo = "Page element context: " + document.activeElement.outerHTML;
-  const body = encodeURIComponent(msg + "\\n\\n---\\n" + pageInfo);
-  const mailto = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=Dev Feedback&body=${body}`;
-  window.open(mailto, '_blank');
-  document.getElementById('devpanel').style.display = 'none';
-}
-
-function cancelDev() {
-  if (confirm("Are you sure you want to cancel?")) {
-    document.getElementById('devpanel').style.display = 'none';
-  }
-}
-</script>
-""", height=0)
+        with st.expander("🛠 Dev Mode - Click to give feedback"):
+            st.markdown("Describe your issue below and send it via Gmail.")
+        
+            feedback = st.text_area("📝 What do you want to report or improve?", height=100, key="dev_feedback")
+            email = st.text_input("📧 Your email (used as Gmail recipient)", key="dev_email")
+        
+            if st.button("✉️ Send Feedback Now", key="send_feedback"):
+                if not feedback or not email:
+                    st.warning("Please fill in both feedback and your email.")
+                else:
+                    subject = quote_plus("Dev Feedback on Amazon Comparison Tool")
+                    body = quote_plus(f"{feedback}\n\n---\nPage context: [Add any details you need here]")
+                    mailto = f"https://mail.google.com/mail/?view=cm&fs=1&to={email}&su={subject}&body={body}"
+                    js = f"""<script>window.open("{mailto}", "_blank")</script>"""
+                    st.components.v1.html(js, height=0)
+        
+        
+        
+        cols = st.columns(st.session_state.num_columns)
+        
+        for i in range(st.session_state.num_columns):
+            if i >= len(st.session_state.product_data):
+                st.session_state.product_data.append({"url": ""})
+            with cols[i]:
+                render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
+        
 

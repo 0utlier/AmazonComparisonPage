@@ -140,16 +140,25 @@ def render_product_column(idx, product, visible_fields):
                 price = product_data.get("pricing", "N/A")
                 st.markdown(f"💰 **{price}**")
 
-            # elif field == "rating":
-            #     rating = product_data.get("reviews", [{}])[0].get("rating", "N/A")
-            #     count = product_data.get("reviews", [{}])[0].get("count", "N/A")
-            #     st.markdown(f"⭐ {rating} [👤 {count}]")
-
-            elif field == "rating":
-                # Fetch the average rating and total reviews directly from the product data
+           elif field == "rating":
                 rating = product_data.get("average_rating", "N/A")
+                
+                # Fallback in case average_rating is missing or not correctly set
+                if rating == "N/A":
+                    reviews = product_data.get("reviews", [])
+                    if reviews:
+                        rating = reviews[0].get("stars", "N/A")
+                    else:
+                        rating = "N/A"
+                
                 count = product_data.get("total_reviews", "N/A")
                 st.markdown(f"⭐ {rating} [👤 {count}]")
+               
+           # elif field == "rating":
+           #      # Fetch the average rating and total reviews directly from the product data
+           #      rating = product_data.get("average_rating", "N/A")
+           #      count = product_data.get("total_reviews", "N/A")
+           #      st.markdown(f"⭐ {rating} [👤 {count}]")
             
             elif field == "imageGallery":
                 imgs = product_data.get("images", [])

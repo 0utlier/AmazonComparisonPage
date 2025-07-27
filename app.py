@@ -153,7 +153,7 @@ def render_product_column(idx, product, visible_fields):
                     for i, other_product in enumerate(st.session_state.product_data):
                         if i == idx:
                             continue
-                        other_price = other_product.get("price")
+                        other_price = other_product.get("pricing")
                         if other_price in (None, "N/A"):
                             continue
                         try:

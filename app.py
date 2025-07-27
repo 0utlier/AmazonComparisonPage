@@ -140,46 +140,44 @@ def render_product_column(idx, product, visible_fields):
 
             elif field == "price":
                 price = product_data.get("pricing", "N/A")
-                if price not in (None, "N/A"):
+            
+                def extract_price(p):
                     try:
-                        current_price = float(str(price).replace("$", "").replace(",", ""))
-                    except ValueError:
-                        current_price = None
-                else:
-                    current_price = None
+                        return float(str(p).replace("$", "").replace(",", ""))
+                    except (ValueError, TypeError):
+                        return None
             
+                current_price = extract_price(price)
                 price_md = f"**💰{price}**"
-                st.session_state.product_data[0]["pricing"] = "$4.29"
-                st.session_state.product_data[1]["pricing"] = "$7.59"
-
-                # Debug: Show how many products we're comparing to
-                st.write("✅ Total products:", len(st.session_state.product_data))
             
-                # Show price difference with other products
                 if current_price is not None and len(st.session_state.product_data) > 1:
                     diffs = []
-                    st.write("🔍 Full product data:", st.session_state.product_data)
+                    st.session_state.product_data[0]["pricing"] = "$4.29"
+                    st.session_state.product_data[1]["pricing"] = "$7.59"
+
                     for i, other_product in enumerate(st.session_state.product_data):
                         if i == idx:
                             continue
-                        other_price = other_product.get("pricing")
-                        st.write(f"🧐 Comparing to column {i+1} → {other_price}")
-                        if other_price in (None, "N/A"):
+                        other_price_raw = other_product.get("pricing", "N/A")
+                        other_price_val = extract_price(other_price_raw)
+                        if other_price_val is None:
                             continue
-                        try:
-                            other_price_val = float(str(other_price).replace("$", "").replace(",", ""))
-                            diff = current_price - other_price_val
-                            diff_color = "green" if diff < 0 else "red" if diff > 0 else "gray"
-                            diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
-                            diff_amount = f"${abs(diff):.2f}"
-                            diffs.append(f"<span style='color:{diff_color};'>[{i+1}] {diff_sign}{diff_amount}</span>")
-                        except ValueError:
-                            continue
+            
+                        diff = current_price - other_price_val
+                        diff_color = "green" if diff < 0 else "red" if diff > 0 else "gray"
+                        diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
+                        diff_amount = f"${abs(diff):.2f}"
+                        diffs.append(f"<span style='color:{diff_color};'>[{i + 1}] {diff_sign}{diff_amount}</span>")
+            
                     if diffs:
                         price_md += "<br>" + "<br>".join(diffs)
             
                 st.markdown(price_md, unsafe_allow_html=True)
 
+
+
+            #//==================================================================================================================================================================================
+            #//==================================================================================================================================================================================
 
 
             elif field == "rating":

@@ -140,7 +140,7 @@ def render_product_column(idx, product, visible_fields):
                 price = product_data.get("pricing", "N/A")
                 st.markdown(f"💰 **{price}**")
 
-           elif field == "rating":
+            elif field == "rating":
                 rating = product_data.get("average_rating", "N/A")
                 
                 # Fallback in case average_rating is missing or not correctly set

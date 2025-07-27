@@ -247,10 +247,6 @@ def render_product_column(idx, product, visible_fields):
                 else:
                     st.markdown("🖼️ No images found")
 
-            else:
-                val = product_data.get(field, "N/A")
-                st.write(f"**{field.capitalize()}**: {val}")
-
             # Generic field
             else:
                 st.write(f"**{field.capitalize()}**: {value or 'N/A'}")

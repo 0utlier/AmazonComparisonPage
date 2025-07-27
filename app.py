@@ -27,6 +27,9 @@ if "visible_fields" not in st.session_state:
 if "product_data" not in st.session_state:
     st.session_state.product_data = []
 
+if "num_columns" not in st.session_state:
+    st.session_state.num_columns = 2
+
 
 def display_field_selector():
     with st.sidebar.expander("🧰 DISPLAY OPTIONS", expanded=True):
@@ -74,7 +77,7 @@ def render_product_column(idx, product, visible_fields):
                     )
                     st.rerun()
 
-                if idx < len(st.session_state.product_urls) - 1 and st.button("➡️ Move Right", key=f"move_right_{idx}"):
+                if idx < st.session_state.num_columns - 1 and st.button("➡️ Move Right", key=f"move_right_{idx}"):
                     st.session_state.product_data[idx + 1], st.session_state.product_data[idx] = (
                         st.session_state.product_data[idx],
                         st.session_state.product_data[idx + 1],
@@ -83,7 +86,7 @@ def render_product_column(idx, product, visible_fields):
 
                 if st.button("🗑️ Remove Product", key=f"remove_product_{idx}"):
                     st.session_state.product_data.pop(idx)
-                    len(st.session_state.product_urls) -= 1
+                    st.session_state.num_columns -= 1
                     st.rerun()
 
     # --- URL input with embedded paste button ---
@@ -158,14 +161,13 @@ def render_product_column(idx, product, visible_fields):
 display_field_selector()
 
 if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
-    len(st.session_state.product_urls) += 1
+    st.session_state.num_columns += 1
     st.rerun()
 
-# Render product columns if there are any
-if len(st.session_state.product_urls) > 0:
-    num_cols = len(st.session_state.product_urls)
-    cols = st.columns(num_cols)
-    for i in range(num_cols):
-        with cols[i]:
-                render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
+cols = st.columns(st.session_state.num_columns)
 
+for i in range(st.session_state.num_columns):
+    if i >= len(st.session_state.product_data):
+        st.session_state.product_data.append({"url": ""})
+    with cols[i]:
+        render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)

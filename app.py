@@ -63,7 +63,7 @@ def fetch_amazon_data(url):
         return {}
 
 def render_product_column(idx, product, visible_fields):
-    col = st.columns([0.7, 1.3, 0.4, 0.4])  # Label, URL, Amazon, Refresh
+    col = st.columns([0.1, 0.3, 0.3, 0.3])  # Label, URL, Amazon, Refresh
 
 # --- Column label and aligned dropdown ---
     with col[0]:
@@ -71,7 +71,7 @@ def render_product_column(idx, product, visible_fields):
         with input_bar[0]:
             st.markdown(f"<div style='padding-top: 0.6em; font-weight: bold'>[{idx + 1}]</div>", unsafe_allow_html=True)
         with input_bar[1]:
-            with st.popover("⋯", use_container_width=True):  # icon for menu
+            with st.popover("<x>", use_container_width=True):  # icon for menu
                 if idx > 0 and st.button("⬅️ Move Left", key=f"move_left_{idx}"):
                     st.session_state.product_data[idx - 1], st.session_state.product_data[idx] = (
                         st.session_state.product_data[idx],

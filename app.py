@@ -122,86 +122,106 @@ def render_product_column(idx, product, visible_fields):
             st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
             st.rerun()
 
-        # --- Load data if needed ---
+            # --- Load data if needed ---
     if url:
         if "json" not in product:
-            with st.markdown("<div style='font-size:16px; animation: pulse 1.5s infinite;'>🔃 Fetching details...</div>", unsafe_allow_html=True):
+            with st.spinner("🔄 Loading product data..."):
                 st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
 
         product_data = st.session_state.product_data[idx].get("json", {})
-        col_heights = st.session_state.get("field_heights", {})
+
+        # Attach basic fields for cross-reference
+        st.session_state.product_data[idx]["pricing"] = product_data.get("pricing", "N/A")
+        st.session_state.product_data[idx]["average_rating"] = product_data.get("average_rating", "N/A")
+        st.session_state.product_data[idx]["review_breakdown"] = product_data.get("reviews", [])
 
         for field in visible_fields:
-            content = ""
-            if field == "title":
-                title = product_data.get("name", "N/A")
-                short_title = f"{title[:150]}{'...' if len(title)>150 else ''}"
-                content = f"<div style='font-size: 14pt; font-weight: bold'>{short_title}</div>"
+            # Collect all products' values for this field
+            all_values = []
+            for p in st.session_state.product_data:
+                pj = p.get("json", {})
+                if field == "title":
+                    val = pj.get("name", "")
+                elif field == "price":
+                    val = pj.get("pricing", "")
+                elif field == "rating":
+                    val = pj.get("average_rating", "N/A")
+                elif field == "imageGallery":
+                    val = pj.get("images", [])
+                else:
+                    val = pj.get(field, "N/A")
+                all_values.append(val)
 
+            # Get current product's value
+            value = all_values[idx]
+
+            # Title
+            if field == "title":
+                value_str = str(value or "N/A")
+                st.markdown(
+                    f"<div style='font-size: 14pt; font-weight: bold'>{value_str[:150]}{'...' if len(value_str)>150 else ''}</div>",
+                    unsafe_allow_html=True
+                )
+
+            # Price
             elif field == "price":
                 def extract_price(p):
                     try:
                         return float(str(p).replace("$", "").replace(",", ""))
-                    except (ValueError, TypeError):
+                    except:
                         return None
 
-                price = product_data.get("pricing", "N/A")
-                current_price = extract_price(price)
-                price_md = f"<strong>💰{price}</strong>"
+                current_price = extract_price(value)
+                price_md = f"**💰{value or 'N/A'}**"
 
-                if current_price is not None and len(st.session_state.product_data) > 1:
+                if current_price is not None:
                     diffs = []
-                    for i, other_product in enumerate(st.session_state.product_data):
+                    for i, other_val in enumerate(all_values):
                         if i == idx:
                             continue
-                        other_price = other_product.get("pricing", "N/A")
-                        other_val = extract_price(other_price)
-                        if other_val is None:
+                        other_price = extract_price(other_val)
+                        if other_price is None:
                             continue
-                        diff = current_price - other_val
+                        diff = current_price - other_price
                         color = "green" if diff < 0 else "red" if diff > 0 else "gray"
                         sign = "+" if diff > 0 else "-" if diff < 0 else "±"
                         amount = f"${abs(diff):.2f}"
-                        diffs.append(f"<span style='color:{color};'>[{i+1}] {sign}{amount}</span>")
+                        diffs.append(f"<span style='color:{color};'>[{i + 1}] {sign}{amount}</span>")
+
                     if diffs:
                         price_md += "<br>" + "<br>".join(diffs)
-                content = price_md
 
+                st.markdown(price_md, unsafe_allow_html=True)
+
+            # Rating with 4-star/5-star counts
             elif field == "rating":
-                rating = product_data.get("average_rating", "N/A")
-                if rating == "N/A":
-                    reviews = product_data.get("reviews", [])
-                    if reviews:
-                        rating = reviews[0].get("stars", "N/A")
-                count = product_data.get("total_reviews", "N/A")
-                content = f"⭐ {rating} [👤 {count}]"
+                rating = value or "N/A"
+                breakdown = product_data.get("reviews", [])
+                total_reviews = product_data.get("total_reviews", "N/A")
 
+                breakdown_md = ""
+                for b in breakdown:
+                    stars = b.get("stars")
+                    count = b.get("count")
+                    if stars in [4, 5]:
+                        breakdown_md += f"<br>🌟 {stars} star: {count}"
+
+                st.markdown(f"⭐ {rating} [👤 {total_reviews}]{breakdown_md}", unsafe_allow_html=True)
+
+            # Image gallery (1 product at a time with expand)
             elif field == "imageGallery":
-                imgs = product_data.get("images", [])
-                if imgs:
-                    st.image(imgs, width=200, use_container_width=True)
+                images = value
+                if images:
+                    for i, img_url in enumerate(images[:1]):  # only first image shown
+                        with st.expander("🖼️ Click to enlarge"):
+                            st.image(img_url, use_container_width=True)
                 else:
-                    content = "🖼️ No images found"
+                    st.markdown("🖼️ No images found")
 
+            # Generic field
             else:
-                val = product_data.get(field, "N/A")
-                content = f"<strong>{field.capitalize()}</strong>: {val}"
+                st.write(f"**{field.capitalize()}**: {value or 'N/A'}")
 
-            # --- Calculate max height for this field across products ---
-            col_heights.setdefault(field, [])
-            col_heights[field].append(len(content.split("<br>")) + content.count("\n"))
-
-            # --- Store the max line count for each field ---
-            max_lines = max(col_heights[field])
-            st.session_state.field_heights = col_heights  # Persist
-
-            # --- Pad short rows for alignment ---
-            line_count = content.count("<br>") + content.count("\n") + 1
-            pad_lines = max_lines - line_count
-            pad_html = "<br>" * pad_lines if pad_lines > 0 else ""
-
-            if field != "imageGallery":
-                st.markdown(content + pad_html, unsafe_allow_html=True)
 
 
 

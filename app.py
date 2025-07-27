@@ -135,6 +135,9 @@ def render_product_column(idx, product, visible_fields):
                 title = product_data.get("name", "N/A")
                 st.markdown(f"<div style='font-size: 14pt; font-weight: bold'>{title[:150]}{'...' if len(title)>150 else ''}</div>", unsafe_allow_html=True)
 
+            #//==================================================================================================================================================================================
+            #//==================================================================================================================================================================================
+
             elif field == "price":
                 price = product_data.get("pricing", "N/A")
                 if price not in (None, "N/A"):
@@ -146,13 +149,16 @@ def render_product_column(idx, product, visible_fields):
                     current_price = None
             
                 price_md = f"**💰{price}**"
-            
+                st.session_state.product_data[0]["pricing"] = "$4.29"
+                st.session_state.product_data[1]["pricing"] = "$7.59"
+
                 # Debug: Show how many products we're comparing to
                 st.write("✅ Total products:", len(st.session_state.product_data))
             
                 # Show price difference with other products
                 if current_price is not None and len(st.session_state.product_data) > 1:
                     diffs = []
+                    st.write("🔍 Full product data:", st.session_state.product_data)
                     for i, other_product in enumerate(st.session_state.product_data):
                         if i == idx:
                             continue

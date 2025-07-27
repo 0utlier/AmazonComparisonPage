@@ -74,7 +74,7 @@ def render_product_column(idx, product, visible_fields):
                     )
                     st.rerun()
 
-                if idx < st.session_state.num_columns - 1 and st.button("➡️ Move Right", key=f"move_right_{idx}"):
+                if idx < len(st.session_state.product_urls) - 1 and st.button("➡️ Move Right", key=f"move_right_{idx}"):
                     st.session_state.product_data[idx + 1], st.session_state.product_data[idx] = (
                         st.session_state.product_data[idx],
                         st.session_state.product_data[idx + 1],
@@ -83,7 +83,7 @@ def render_product_column(idx, product, visible_fields):
 
                 if st.button("🗑️ Remove Product", key=f"remove_product_{idx}"):
                     st.session_state.product_data.pop(idx)
-                    st.session_state.num_columns -= 1
+                    len(st.session_state.product_urls) -= 1
                     st.rerun()
 
     # --- URL input with embedded paste button ---
@@ -158,11 +158,11 @@ def render_product_column(idx, product, visible_fields):
 display_field_selector()
 
 if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
-    st.session_state.num_columns += 1
+    len(st.session_state.product_urls) += 1
     st.rerun()
 
 # Render product columns if there are any
-if st.session_state.num_columns > 0:
+if len(st.session_state.product_urls) > 0:
     num_cols = len(st.session_state.product_urls)
     cols = st.columns(num_cols)
     for i in range(num_cols):

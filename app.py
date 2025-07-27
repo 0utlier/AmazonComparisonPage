@@ -63,7 +63,7 @@ def fetch_amazon_data(url):
         return {}
 
 def render_product_column(idx, product, visible_fields):
-    col = st.columns([0.4, 0.4, 0.4, 0.4])  # Label, URL, Amazon, Refresh
+    col = st.columns([0.3, 0.4, 0.4, 0.4])  # Label, URL, Amazon, Refresh
 
 # --- Column label and aligned dropdown ---
     with col[0]:

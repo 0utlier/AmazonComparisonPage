@@ -149,7 +149,9 @@ def render_product_column(idx, product, visible_fields):
             
                 current_price = extract_price(price)
                 price_md = f"**💰{price}**"
-            
+                st.session_state.product_data[2]["pricing"] = "$4.29"
+                st.session_state.product_data[1]["pricing"] = "$7.59"
+
                 if current_price is not None and len(st.session_state.product_data) > 1:
                     diffs = []
                     for i, other_product in enumerate(st.session_state.product_data):

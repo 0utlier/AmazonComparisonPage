@@ -167,7 +167,7 @@ def render_product_column(idx, product, visible_fields):
                         diffs.append(f"<span style='color:{diff_color};'>[{i + 1}] {diff_sign}{diff_amount}</span>")
             
                     if diffs:
-                        price_md += "<br><br><br>" + "<br>".join(diffs)
+                        price_md += "<br>" + "<br>".join(diffs)
             
                 st.markdown(price_md, unsafe_allow_html=True)
 

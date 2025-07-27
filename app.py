@@ -1,4 +1,4 @@
-# v0.51
+# v0.52
 import streamlit as st
 import requests
 from urllib.parse import quote_plus
@@ -33,7 +33,7 @@ if "num_columns" not in st.session_state:
 
 
 def display_field_selector():
-    with st.sidebar.expander("DISPLAY OPTIONS", expanded=True):
+    with st.sidebar.expander("DISPLAY OPTIONS", expanded=False):
         if st.button("✅ Default Options"):
             st.session_state.visible_fields = DEFAULT_FIELDS.copy()
 
@@ -225,9 +225,9 @@ def render_product_column(idx, product, visible_fields):
                 total_pct = pct_4 + pct_5
             
                 if pct_4 or pct_5:
-                    rating_str += f"<div>{total_pct}% (5⭐ {pct_5}% - 4⭐ {pct_4}%)"
+                    rating_str += f"<br>{total_pct}%<br>5⭐ {pct_5}% - 4⭐ {pct_4}%"
             
-                st.markdown(rating_str)
+                st.markdown(rating_str, unsafe_allow_html=True)
             
             # Image Gallery
             elif field == "imageGallery":

@@ -252,6 +252,32 @@ if st.button("➕ Add Product Column", help="Add a new Amazon product for compar
     st.session_state.num_columns += 1
     st.rerun()
 
+if st.button("🛠 Dev Mode"):
+    components.html(
+        """
+        <script>
+        alert("Click anywhere on the page to report a UI issue.");
+
+        document.addEventListener("click", function handler(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const element = e.target;
+            const outerHTML = element.outerHTML;
+
+            const body = encodeURIComponent("I noticed an issue with this element:\\n\\n" + outerHTML);
+            const url = "https://mail.google.com/mail/?view=cm&fs=1&to=youremail@example.com&su=Dev Feedback&body=" + body;
+            window.open(url, "_blank");
+
+            document.removeEventListener("click", handler, true);
+        }, true);
+        </script>
+        """,
+        height=0,
+        scrolling=False
+    )
+
+
 cols = st.columns(st.session_state.num_columns)
 
 for i in range(st.session_state.num_columns):

@@ -248,54 +248,58 @@ def render_product_column(idx, product, visible_fields):
 # ----------- MAIN -----------
 display_field_selector()
 
-if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
-    st.session_state.num_columns += 1
-    st.rerun()
+button_cols = st.columns([1, 1])
 
-if st.button("🛠 Dev Mode"):
-    components.html(
-        """
-        <style>
-        #dev-banner {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #333;
-            color: white;
-            padding: 10px 15px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            font-family: sans-serif;
-            z-index: 9999;
-        }
-        </style>
+with button_cols[0]:
+    if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
+        st.session_state.num_columns += 1
+        st.rerun()
 
-        <div id="dev-banner">🛠 Click any element to send feedback...</div>
+with button_cols[1]:
+    if st.button("🛠 Dev Mode"):
+        components.html(
+            """
+            <style>
+            #dev-banner {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                background: #333;
+                color: white;
+                padding: 10px 15px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                font-family: sans-serif;
+                z-index: 9999;
+            }
+            </style>
 
-        <script>
-        const banner = document.getElementById("dev-banner");
+            <div id="dev-banner">🛠 Click any element to send feedback...</div>
 
-        function handleClick(e) {
-            e.preventDefault();
-            e.stopPropagation();
+            <script>
+            const banner = document.getElementById("dev-banner");
 
-            const element = e.target;
-            const outerHTML = element.outerHTML;
-            const body = encodeURIComponent("I noticed an issue with this element:\\n\\n" + outerHTML);
-            const gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1&to=youremail@example.com&su=Dev Feedback&body=" + body;
-            
-            window.open(gmailUrl, "_blank");
-            banner.remove();
-            document.removeEventListener("click", handleClick, true);
-        }
+            function handleClick(e) {
+                e.preventDefault();
+                e.stopPropagation();
 
-        setTimeout(() => {
-            document.addEventListener("click", handleClick, true);
-        }, 100); // delay so the button click doesn't trigger it
-        </script>
-        """,
-        height=0
-    )
+                const element = e.target;
+                const outerHTML = element.outerHTML;
+                const body = encodeURIComponent("I noticed an issue with this element:\\n\\n" + outerHTML);
+                const gmailUrl = "https://mail.google.com/mail/?view=cm&fs=1&to=youremail@example.com&su=Dev Feedback&body=" + body;
+                
+                window.open(gmailUrl, "_blank");
+                banner.remove();
+                document.removeEventListener("click", handleClick, true);
+            }
+
+            setTimeout(() => {
+                document.addEventListener("click", handleClick, true);
+            }, 100);
+            </script>
+            """,
+            height=0
+        )
 
 cols = st.columns(st.session_state.num_columns)
 

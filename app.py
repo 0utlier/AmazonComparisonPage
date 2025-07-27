@@ -164,10 +164,10 @@ if st.button("➕ Add Product Column", help="Add a new Amazon product for compar
     st.session_state.num_columns += 1
     st.rerun()
 
-cols = st.columns(st.session_state.num_columns)
+# Render product columns if there are any
+if st.session_state.num_columns > 0:
+    cols = st.columns(st.session_state.num_columns)
+    for i in range(st.session_state.num_columns):
+        with cols[i]:
+            render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
 
-for i in range(st.session_state.num_columns):
-    if i >= len(st.session_state.product_data):
-        st.session_state.product_data.append({"url": ""})
-    with cols[i]:
-        render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)

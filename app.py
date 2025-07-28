@@ -241,12 +241,10 @@ def render_product_column(idx, product, visible_fields):
                     image_html = '<div class="scrolling-wrapper">'
                     for img in imgs:
                         image_html += f'<img src="{img}" alt="product image">'
+                        with st.expander("🖼️ Click to enlarge"):
+                            st.image(image_html, use_container_width=True)
                     image_html += '</div>'
                     
-                    for i, img_url in enumerate(imgs[:1]):  # only first image shown
-                        with st.expander("🖼️ Click to enlarge"):
-                            st.image(img_url, use_container_width=True)
-
                     st.markdown(image_html, unsafe_allow_html=True)
 
             # elif field == "ImageGallery":

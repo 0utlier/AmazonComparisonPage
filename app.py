@@ -215,9 +215,12 @@ def render_product_column(idx, product, visible_fields):
                     rating_str += f" {total_pct}%<br>5⭐ {pct_5}% - 4⭐ {pct_4}%"
 
                 st.markdown(rating_str, unsafe_allow_html=True)
+
             elif field == "customers_say":
-                value_str = str(value or "N/A")
-                st.markdown(f"- **{summary}** ({count} mentions)")
+                customer_summary = product_data.get("customers_say", {}).get("summary", "")
+                # value_str = str(value or "N/A")
+                st.markdown(customer_summary)
+                # st.markdown(f"- **{summary}** ({count} mentions)")
 
                 # st.markdown(
                 #     f"<div style='font-size: 14pt; font-weight: bold'>{value_str[:150]}{'...' if len(value_str)>150 else ''}</div>",

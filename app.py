@@ -285,7 +285,8 @@ def render_product_column(idx, product, visible_fields):
                         """
             
                     # Add JavaScript for modal functionality
-                    html += textwrap.dedent("""
+                    html += (
+                        """
                         <script>
                         function openModal(id) {
                             event.stopPropagation();
@@ -296,7 +297,9 @@ def render_product_column(idx, product, visible_fields):
                             document.getElementById("modal" + index).style.display = "none";
                         }
                         </script>
-                    """)
+                        """
+                    )
+
 
             
                     st.markdown(html, unsafe_allow_html=True)

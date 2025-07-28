@@ -220,11 +220,13 @@ def render_product_column(idx, product, visible_fields):
 
 
 
-            
+                   
+          
+
             elif field == "ImageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
-                    # Style for the scrolling gallery and the modal
+                    # Single horizontal scrollable row of same-sized images
                     scroll_style = """
                         <style>
                         .scrolling-wrapper {
@@ -236,158 +238,17 @@ def render_product_column(idx, product, visible_fields):
                             height: 150px;
                             margin-right: 10px;
                             border-radius: 8px;
-                            cursor: pointer;
-                        }
-                        .expand-btn {
-                            position: absolute;
-                            top: 10px;
-                            right: 10px;
-                            background-color: rgba(0, 0, 0, 0.6);
-                            color: white;
-                            border: none;
-                            border-radius: 5px;
-                            padding: 5px 10px;
-                            cursor: pointer;
-                            font-size: 12px;
-                        }
-                        .expand-btn:hover {
-                            background-color: rgba(0, 0, 0, 0.8);
-                        }
-                        .image-container {
-                            position: relative;
-                            display: inline-block;
-                        }
-                        /* Modal styling */
-                        .modal {
-                            display: none;
-                            position: fixed;
-                            z-index: 1;
-                            left: 0;
-                            top: 0;
-                            width: 100%;
-                            height: 100%;
-                            overflow: auto;
-                            background-color: rgba(0, 0, 0, 0.8);
-                        }
-                        .modal-content {
-                            position: relative;
-                            margin: auto;
-                            top: 50%;
-                            transform: translateY(-50%);
-                            width: 70%;
-                            max-width: 700px;
-                        }
-                        .modal-content img {
-                            width: 100%;
-                            height: auto;
-                            border-radius: 8px;
-                        }
-                        .close-btn {
-                            position: absolute;
-                            top: 10px;
-                            right: 10px;
-                            font-size: 30px;
-                            color: white;
-                            cursor: pointer;
                         }
                         </style>
                     """
                     st.markdown(scroll_style, unsafe_allow_html=True)
             
-                    # HTML for the image gallery with expand buttons
                     image_html = '<div class="scrolling-wrapper">'
-                    for i, img in enumerate(imgs):
-                        image_html += f'''
-                            <div class="image-container">
-                                <button class="expand-btn" onclick="openModal('{img}')">🔍</button>
-                                <img src="{img}" alt="product image">
-                            </div>
-                        '''
+                    for img in imgs:
+                        image_html += f'<img src="{img}" alt="product image">'
                     image_html += '</div>'
             
-                    # JavaScript for modal behavior
-                    modal_script = """
-                        <script>
-                        // Function to open the modal
-                        function openModal(imgSrc) {
-                            // Create modal element if not already created
-                            if (!document.getElementById('modal')) {
-                                const modal = document.createElement('div');
-                                modal.id = 'modal';
-                                modal.classList.add('modal');
-                                document.body.appendChild(modal);
-                                
-                                // Modal content area
-                                const modalContent = document.createElement('div');
-                                modalContent.classList.add('modal-content');
-                                modal.appendChild(modalContent);
-                                
-                                // Close button for modal
-                                const closeBtn = document.createElement('span');
-                                closeBtn.classList.add('close-btn');
-                                closeBtn.innerHTML = '&times;';
-                                modalContent.appendChild(closeBtn);
-                                
-                                // Add close event to the close button
-                                closeBtn.addEventListener('click', function() {
-                                    modal.style.display = 'none';
-                                });
-                                
-                                // Add ESC key event listener to close modal
-                                document.addEventListener('keydown', function(e) {
-                                    if (e.key === "Escape") {
-                                        modal.style.display = 'none';
-                                    }
-                                });
-                            }
-                            
-                            // Show the modal and set the image source
-                            const modal = document.getElementById('modal');
-                            const modalImg = document.createElement('img');
-                            modal.querySelector('.modal-content').appendChild(modalImg);
-                            modalImg.src = imgSrc;
-                            modal.style.display = 'block';
-                        }
-                        </script>
-                    """
-                    
-                    # Render the image gallery and modal script
                     st.markdown(image_html, unsafe_allow_html=True)
-                    st.markdown(modal_script, unsafe_allow_html=True)
-
-
-
-
-
-        
-          
-
-            # elif field == "ImageGallery":
-            #     imgs = product_data.get("images", [])
-            #     if imgs:
-            #         # Single horizontal scrollable row of same-sized images
-            #         scroll_style = """
-            #             <style>
-            #             .scrolling-wrapper {
-            #                 display: flex;
-            #                 overflow-x: auto;
-            #                 padding-bottom: 10px;
-            #             }
-            #             .scrolling-wrapper img {
-            #                 height: 150px;
-            #                 margin-right: 10px;
-            #                 border-radius: 8px;
-            #             }
-            #             </style>
-            #         """
-            #         st.markdown(scroll_style, unsafe_allow_html=True)
-            
-            #         image_html = '<div class="scrolling-wrapper">'
-            #         for img in imgs:
-            #             image_html += f'<img src="{img}" alt="product image">'
-            #         image_html += '</div>'
-            
-            #         st.markdown(image_html, unsafe_allow_html=True)
 
 
             # elif field == "ImageGallery":

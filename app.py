@@ -145,6 +145,8 @@ def render_product_column(idx, product, visible_fields):
                     val = pj.get("pricing", "")
                 elif field == "rating":
                     val = pj.get("average_rating", "N/A")
+                elif field == "customers say":
+                    val = pj.get("customers_say", "N/A")
                 elif field == "imageGallery":
                     val = pj.get("images", [])
                 else:
@@ -213,18 +215,24 @@ def render_product_column(idx, product, visible_fields):
                     rating_str += f" {total_pct}%<br>5⭐ {pct_5}% - 4⭐ {pct_4}%"
 
                 st.markdown(rating_str, unsafe_allow_html=True)
-
             elif field == "customers_say":
-                customer_data = product_data.get("customers_say", [])
-                if customer_data and isinstance(customer_data, list):
-                    with st.expander("💬 What Customers Are Saying", expanded=True):
-                        for item in customer_data:
-                            summary = item.get("summary")
-                            count = item.get("mention_count")
-                            if summary:
-                                st.markdown(f"- **{summary}** ({count} mentions)")
-                else:
-                    st.write("No customer feedback summary available.")
+                value_str = str(value or "N/A")
+                st.markdown(
+                    f"<div style='font-size: 14pt; font-weight: bold'>{value_str[:150]}{'...' if len(value_str)>150 else ''}</div>",
+                    unsafe_allow_html=True
+                )
+
+            # elif field == "customers_say":
+            #     customer_data = product_data.get("customers_say", [])
+            #     if customer_data and isinstance(customer_data, list):
+            #         with st.expander("💬 What Customers Are Saying", expanded=True):
+            #             for item in customer_data:
+            #                 summary = item.get("summary")
+            #                 count = item.get("mention_count")
+            #                 if summary:
+            #                     st.markdown(f"- **{summary}** ({count} mentions)")
+            #     else:
+            #         st.write("No customer feedback summary available.")
 
             elif field == "imageGallery":
                 imgs = product_data.get("images", [])

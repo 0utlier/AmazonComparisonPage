@@ -219,104 +219,16 @@ def render_product_column(idx, product, visible_fields):
                 st.markdown(customer_summary)
 
             elif field == "ImageGallery":
-                imgs = product_data.get("images", [])
-                if imgs:
-                    # Inject styles for horizontal scrolling and modal
-                    st.markdown("""
-                        <style>
-                        .scrolling-wrapper {
-                            display: flex;
-                            overflow-x: auto;
-                            padding-bottom: 10px;
-                        }
-                        .scrolling-wrapper img {
-                            height: 150px;
-                            margin-right: 10px;
-                            border-radius: 8px;
-                            cursor: pointer;
-                            transition: transform 0.2s;
-                        }
-                        .scrolling-wrapper img:hover {
-                            transform: scale(1.05);
-                        }
-                        .modal {
-                            display: none;
-                            position: fixed;
-                            z-index: 1000;
-                            padding-top: 60px;
-                            left: 0;
-                            top: 0;
-                            width: 100%;
-                            height: 100%;
-                            overflow: auto;
-                            background-color: rgba(0,0,0,0.9);
-                        }
-                        .modal-content {
-                            margin: auto;
-                            display: block;
-                            max-width: 90%;
-                            max-height: 90%;
-                        }
-                        .close {
-                            position: absolute;
-                            top: 30px;
-                            right: 45px;
-                            color: #fff;
-                            font-size: 40px;
-                            font-weight: bold;
-                            cursor: pointer;
-                        }
-                        </style>
-                    """, unsafe_allow_html=True)
-            
-                    # Build the scrolling image row
-                    html = '<div class="scrolling-wrapper">'
-                    for i, img in enumerate(imgs):
-                        html += f'<img src="{img}" onclick="openModal(\'modal{i}\')">'
-                    html += '</div>'
-            
-                    # Build modal HTML for each image
-                    for i, img in enumerate(imgs):
-                        html += f"""
-                            <div id="modal1" class="modal" onclick="closeModal('1')">
-                                <span class="close" onclick="event.stopPropagation(); closeModal('1')">&times;</span>
-                                <img class="modal-content" src="https://m.media-amazon.com/images/I/411OUrMGfZL.jpg" onclick="event.stopPropagation();">
-                            </div>
-                        """
-            
-                    # Add JavaScript for modal functionality
-                    html += (
-                        """
-                        <script>
-                        function openModal(id) {
-                            event.stopPropagation();
-                            document.getElementById(id).style.display = "block";
-                        }
-                        function closeModal(index) {
-                            event.stopPropagation();
-                            document.getElementById("modal" + index).style.display = "none";
-                        }
-                        </script>
-                        """
-                    )
-
-
-            
-                    st.markdown(html, unsafe_allow_html=True)
-
-
-
-        # elif field == "ImageGallery":
-            #     imgs = product_data.get("images", [])
-            #     if imgs:
-            #         # Limit the number of images to display (4-5 per row)
-            #         img_per_row = 5
-            #         rows = [imgs[i:i+img_per_row] for i in range(0, len(imgs), img_per_row)]
-            #         for row in rows:
-            #             cols = st.columns(len(row))
-            #             for i, img in enumerate(row):
-            #                 with cols[i]:
-            #                     st.image(img, width=200, use_container_width=True)  # Adjust width as needed
+                    imgs = product_data.get("images", [])
+                    if imgs:
+                        # Limit the number of images to display (4-5 per row)
+                        img_per_row = 5
+                        rows = [imgs[i:i+img_per_row] for i in range(0, len(imgs), img_per_row)]
+                        for row in rows:
+                            cols = st.columns(len(row))
+                            for i, img in enumerate(row):
+                                with cols[i]:
+                                    st.image(img, width=200, use_container_width=True)  # Adjust width as needed
 
             else:
                 st.write(f"**{field.capitalize()}**: {value or 'N/A'}")

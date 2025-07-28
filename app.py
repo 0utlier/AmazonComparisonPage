@@ -94,7 +94,7 @@ def render_product_column(idx, product, visible_fields):
     with col[1]:
         url_input_key = f"url_{idx}"
         default_url = product.get("url", "")
-        input_cols = st.columns([1])
+        input_cols = st.columns([4, 1])
 
         with input_cols[0]:
             url = st.text_input(
@@ -104,6 +104,11 @@ def render_product_column(idx, product, visible_fields):
                 key=url_input_key,
                 label_visibility="collapsed"
             )
+
+        with input_cols[1]:
+            if st.button("REFRESH PRICES"):
+            update_all_pricing()
+            
 
         # Refresh only if URL changed
         if url != product.get("url"):

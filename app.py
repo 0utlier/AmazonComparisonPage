@@ -12,16 +12,16 @@ SCRAPER_API_KEY = "b1cd14dc050586097b7ea4d0d19652c8"
 
 DEFAULT_FIELDS = ["title", "price", "rating", "customers_say", "imageGallery"]
 ALL_FIELDS = [
-    "title",
-    "price",
-    "rating",
-    "customers_say",
-    "imageGallery",
-    "description",
-    "brand",
-    "availability",
-    "features",
-    "categories",
+    "Title",
+    "Price",
+    "Rating",
+    "Customers Say",
+    "ImageGallery",
+    "Description",
+    "Brand",
+    "Availability",
+    "Features",
+    "Categories",
 ]
 
 
@@ -69,7 +69,7 @@ def fetch_amazon_data(url):
 
 def render_product_column(idx, product, visible_fields):
     
-    col = st.columns([0.15, 0.55, 0.1, 0.15])  # Label, URL, Amazon, Refresh
+    col = st.columns([0.15, 0.45, 0.1, 0.15])  # Label, URL, Amazon, Refresh
 
     with col[0]:
         with st.popover(f"[{idx + 1}]", use_container_width=True):
@@ -212,32 +212,13 @@ def render_product_column(idx, product, visible_fields):
                 total_pct = pct_4 + pct_5
 
                 if pct_4 or pct_5:
-                    rating_str += f" {total_pct}%<br>5⭐ {pct_5}% - 4⭐ {pct_4}%"
+                    rating_str += f" {total_pct}%<br>5⭐ {pct_5}% // 4⭐ {pct_4}%"
 
                 st.markdown(rating_str, unsafe_allow_html=True)
 
             elif field == "customers_say":
                 customer_summary = product_data.get("customers_say", {}).get("summary", "")
-                # value_str = str(value or "N/A")
                 st.markdown(customer_summary)
-                # st.markdown(f"- **{summary}** ({count} mentions)")
-
-                # st.markdown(
-                #     f"<div style='font-size: 14pt; font-weight: bold'>{value_str[:150]}{'...' if len(value_str)>150 else ''}</div>",
-                #     unsafe_allow_html=True
-                # )
-
-            # elif field == "customers_say":
-            #     customer_data = product_data.get("customers_say", [])
-            #     if customer_data and isinstance(customer_data, list):
-            #         with st.expander("💬 What Customers Are Saying", expanded=True):
-            #             for item in customer_data:
-            #                 summary = item.get("summary")
-            #                 count = item.get("mention_count")
-            #                 if summary:
-            #                     st.markdown(f"- **{summary}** ({count} mentions)")
-            #     else:
-            #         st.write("No customer feedback summary available.")
 
             elif field == "imageGallery":
                 imgs = product_data.get("images", [])

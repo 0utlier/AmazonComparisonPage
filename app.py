@@ -217,7 +217,10 @@ def render_product_column(idx, product, visible_fields):
             elif field == "Customers Say":
                 customer_summary = product_data.get("customers_say", {}).get("summary", "")
                 st.markdown(customer_summary)
-                
+
+
+
+            
             elif field == "ImageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
@@ -235,22 +238,80 @@ def render_product_column(idx, product, visible_fields):
                             border-radius: 8px;
                             cursor: pointer;
                         }
+                        .expand-btn {
+                            position: absolute;
+                            top: 10px;
+                            right: 10px;
+                            background-color: rgba(0, 0, 0, 0.6);
+                            color: white;
+                            border: none;
+                            border-radius: 5px;
+                            padding: 5px 10px;
+                            cursor: pointer;
+                            font-size: 12px;
+                        }
+                        .expand-btn:hover {
+                            background-color: rgba(0, 0, 0, 0.8);
+                        }
+                        .image-container {
+                            position: relative;
+                            display: inline-block;
+                        }
                         </style>
                     """
                     st.markdown(scroll_style, unsafe_allow_html=True)
             
-                    # Single horizontal scrollable row of images
+                    # HTML for the image gallery
                     image_html = '<div class="scrolling-wrapper">'
-                    for img in imgs:
-                        image_html += f'<img src="{img}" alt="product image">'
+                    for i, img in enumerate(imgs):
+                        image_html += f'''
+                            <div class="image-container">
+                                <button class="expand-btn" onclick="openModal('{img}')">🔍</button>
+                                <img src="{img}" alt="product image">
+                            </div>
+                        '''
                     image_html += '</div>'
             
+                    # JavaScript for modal behavior (open image in a modal and close with ESC key)
+                    modal_script = """
+                        <script>
+                        function openModal(imgSrc) {
+                            // Create modal element if not already created
+                            if (!document.getElementById('modal')) {
+                                const modal = document.createElement('div');
+                                modal.id = 'modal';
+                                modal.classList.add('modal');
+                                document.body.appendChild(modal);
+                                
+                                // Add close event to the modal
+                                modal.addEventListener('click', function() {
+                                    modal.style.display = 'none';
+                                });
+                                
+                                // Insert image in modal
+                                const modalImg = document.createElement('img');
+                                modal.appendChild(modalImg);
+                                
+                                // Add ESC key event listener to close modal
+                                document.addEventListener('keydown', function(e) {
+                                    if (e.key === "Escape") {
+                                        modal.style.display = 'none';
+                                    }
+                                });
+                            }
+                            
+                            // Show the modal and set the image source
+                            const modal = document.getElementById('modal');
+                            const modalImg = modal.querySelector('img');
+                            modalImg.src = imgSrc;
+                            modal.style.display = 'flex';
+                        }
+                        </script>
+                    """
+                    # Render the image gallery and modal script in Streamlit
                     st.markdown(image_html, unsafe_allow_html=True)
-            
-                    # Create individual expanders for each image
-                    for img in imgs:
-                        with st.expander("🖼️ Click to enlarge", expanded=False):
-                            st.image(img, use_container_width=True)
+                    st.markdown(modal_script, unsafe_allow_html=True)
+
 
 
 

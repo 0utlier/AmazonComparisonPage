@@ -10,7 +10,7 @@ st.title("🛍️ Amazon Product Comparison")
 
 SCRAPER_API_KEY = "b1cd14dc050586097b7ea4d0d19652c8"
 
-DEFAULT_FIELDS = ["title", "price", "rating", "customers_say", "imageGallery"]
+DEFAULT_FIELDS = ["Title", "Price", "Rating", "Customers Say", "ImageGallery"]
 ALL_FIELDS = [
     "Title",
     "Price",

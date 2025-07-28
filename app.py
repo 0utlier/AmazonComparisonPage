@@ -105,9 +105,9 @@ def render_product_column(idx, product, visible_fields):
                 label_visibility="collapsed"
             )
 
-        with input_cols[1]:
-            if st.button("REFRESH PRICES"):
-                update_all_pricing()
+        # with input_cols[1]:
+        #     if st.button("REFRESH PRICES"):
+        #         update_all_pricing()
             
 
         # Refresh only if URL changed
@@ -246,9 +246,6 @@ display_field_selector()
 if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
     st.session_state.num_columns += 1
     st.rerun()
-
-# Ensure all pricing values are calculated before rendering
-update_all_pricing()
 
 cols = st.columns(st.session_state.num_columns)
 

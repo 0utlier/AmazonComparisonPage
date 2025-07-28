@@ -69,7 +69,7 @@ def fetch_amazon_data(url):
 
 def render_product_column(idx, product, visible_fields):
     
-    col = st.columns([0.15, 0.65, 0.01, 0.15])  # Label, URL, Amazon, Refresh
+    col = st.columns([0.15, 0.75, 0.15, 0.1])  # Label, URL, Amazon, Refresh
 
     with col[0]:
         with st.popover(f"[{idx + 1}]", use_container_width=True):
@@ -95,16 +95,27 @@ def render_product_column(idx, product, visible_fields):
     with col[1]:
         url_input_key = f"url_{idx}"
         default_url = product.get("url", "")
-        input_cols = st.columns([4, 1])
 
-        with input_cols[0]:
-            url = st.text_input(
-                "",
-                value=default_url,
-                placeholder="Paste Amazon product URL here",
-                key=url_input_key,
-                label_visibility="collapsed"
-            )
+        url = st.text_input(
+            "",
+            value=default_url,
+            placeholder="Paste Amazon product URL here",
+            key=url_input_key,
+            label_visibility="collapsed"
+        )
+
+        # url_input_key = f"url_{idx}"
+        # default_url = product.get("url", "")
+        # input_cols = st.columns([4, 1])
+
+        # with input_cols[0]:
+        #     url = st.text_input(
+        #         "",
+        #         value=default_url,
+        #         placeholder="Paste Amazon product URL here",
+        #         key=url_input_key,
+        #         label_visibility="collapsed"
+        #     )
 
         # Refresh only if URL changed
         if url != product.get("url"):

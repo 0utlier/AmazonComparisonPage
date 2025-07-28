@@ -67,8 +67,7 @@ def fetch_amazon_data(url):
 
 
 def render_product_column(idx, product, visible_fields):
-    update_all_pricing()
-
+    
     col = st.columns([0.15, 0.55, 0.1, 0.15])  # Label, URL, Amazon, Refresh
 
     with col[0]:
@@ -225,16 +224,15 @@ def render_product_column(idx, product, visible_fields):
 
 # ----------- UPDATE other columns -----------
 def update_all_pricing():
-    for idx, product in enumerate(st.session_state.product_data):
+    for product in st.session_state.product_data:
         product_data = product.get("json", {})
         price = product_data.get("pricing", "N/A")
 
         try:
-            current_price = float(str(price).replace("$", "").replace(",", ""))
+            product["pricing_float"] = float(str(price).replace("$", "").replace(",", ""))
         except:
-            current_price = None
+            product["pricing_float"] = None
 
-        product["pricing_float"] = current_price
 
 # ----------- MAIN -----------
 # Note: sidebar is hidden but logic still applies if you expose it
@@ -243,6 +241,9 @@ display_field_selector()
 if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
     st.session_state.num_columns += 1
     st.rerun()
+
+# Ensure all pricing values are calculated before rendering
+update_all_pricing()
 
 cols = st.columns(st.session_state.num_columns)
 

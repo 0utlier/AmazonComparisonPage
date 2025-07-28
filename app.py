@@ -217,13 +217,11 @@ def render_product_column(idx, product, visible_fields):
             elif field == "Customers Say":
                 customer_summary = product_data.get("customers_say", {}).get("summary", "")
                 st.markdown(customer_summary)
-
-
-        
+                
             elif field == "ImageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
-                    # Style for the scrolling gallery and modal pop-up for expanded images
+                    # Style for the scrolling gallery
                     scroll_style = """
                         <style>
                         .scrolling-wrapper {
@@ -237,66 +235,27 @@ def render_product_column(idx, product, visible_fields):
                             border-radius: 8px;
                             cursor: pointer;
                         }
-                        /* Modal (Image Popup) */
-                        .modal {
-                            display: none;
-                            position: fixed;
-                            z-index: 999;
-                            left: 0;
-                            top: 0;
-                            width: 100%;
-                            height: 100%;
-                            background-color: rgba(0, 0, 0, 0.9);
-                            justify-content: center;
-                            align-items: center;
-                        }
-                        .modal img {
-                            max-width: 90%;
-                            max-height: 80%;
-                            border-radius: 8px;
-                        }
                         </style>
                     """
                     st.markdown(scroll_style, unsafe_allow_html=True)
             
-                    # HTML for the image gallery
+                    # Single horizontal scrollable row of images
                     image_html = '<div class="scrolling-wrapper">'
-                    for i, img in enumerate(imgs):
-                        image_html += f'<img src="{img}" alt="product image" onclick="openModal(\'{img}\')">'
+                    for img in imgs:
+                        image_html += f'<img src="{img}" alt="product image">'
                     image_html += '</div>'
-                    
-                    # Use st.components.v1.html to inject the HTML and JavaScript into the Streamlit app
-                    modal_script = """
-                        <script>
-                        function openModal(imgSrc) {
-                            // Create modal element if not already created
-                            if (!document.getElementById('modal')) {
-                                const modal = document.createElement('div');
-                                modal.id = 'modal';
-                                modal.classList.add('modal');
-                                document.body.appendChild(modal);
-                                
-                                // Add close event to the modal
-                                modal.addEventListener('click', function() {
-                                    modal.style.display = 'none';
-                                });
-                                
-                                // Insert image in modal
-                                const modalImg = document.createElement('img');
-                                modal.appendChild(modalImg);
-                            }
-                            // Show the modal and set the image source
-                            const modal = document.getElementById('modal');
-                            const modalImg = modal.querySelector('img');
-                            modalImg.src = imgSrc;
-                            modal.style.display = 'flex';
-                        }
-                        </script>
-                    """
-                    # Render the HTML and JavaScript in Streamlit using components.v1
-                    st.components.v1.html(image_html + modal_script, height=200)
+            
+                    st.markdown(image_html, unsafe_allow_html=True)
+            
+                    # Create individual expanders for each image
+                    for img in imgs:
+                        with st.expander("🖼️ Click to enlarge", expanded=False):
+                            st.image(img, use_container_width=True)
 
 
+
+        
+          
 
             # elif field == "ImageGallery":
             #     imgs = product_data.get("images", [])

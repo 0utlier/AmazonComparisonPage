@@ -219,16 +219,43 @@ def render_product_column(idx, product, visible_fields):
                 st.markdown(customer_summary)
 
             elif field == "ImageGallery":
-                    imgs = product_data.get("images", [])
-                    if imgs:
-                        # Limit the number of images to display (4-5 per row)
-                        img_per_row = 5
-                        rows = [imgs[i:i+img_per_row] for i in range(0, len(imgs), img_per_row)]
-                        for row in rows:
-                            cols = st.columns(len(row))
-                            for i, img in enumerate(row):
-                                with cols[i]:
-                                    st.image(img, width=200, use_container_width=True)  # Adjust width as needed
+                imgs = product_data.get("images", [])
+                if imgs:
+                    # Single horizontal scrollable row of same-sized images
+                    scroll_style = """
+                        <style>
+                        .scrolling-wrapper {
+                            display: flex;
+                            overflow-x: auto;
+                            padding-bottom: 10px;
+                        }
+                        .scrolling-wrapper img {
+                            height: 150px;
+                            margin-right: 10px;
+                            border-radius: 8px;
+                        }
+                        </style>
+                    """
+                    st.markdown(scroll_style, unsafe_allow_html=True)
+            
+                    image_html = '<div class="scrolling-wrapper">'
+                    for img in imgs:
+                        image_html += f'<img src="{img}" alt="product image">'
+                    image_html += '</div>'
+            
+                    st.markdown(image_html, unsafe_allow_html=True)
+
+            # elif field == "ImageGallery":
+            #         imgs = product_data.get("images", [])
+            #         if imgs:
+            #             # Limit the number of images to display (4-5 per row)
+            #             img_per_row = 5
+            #             rows = [imgs[i:i+img_per_row] for i in range(0, len(imgs), img_per_row)]
+            #             for row in rows:
+            #                 cols = st.columns(len(row))
+            #                 for i, img in enumerate(row):
+            #                     with cols[i]:
+            #                         st.image(img, width=200, use_container_width=True)  # Adjust width as needed
 
             else:
                 st.write(f"**{field.capitalize()}**: {value or 'N/A'}")

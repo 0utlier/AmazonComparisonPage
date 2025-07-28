@@ -137,15 +137,15 @@ def render_product_column(idx, product, visible_fields):
             all_values = []
             for p in st.session_state.product_data:
                 pj = p.get("json", {})
-                if field == "title":
+                if field == "Title":
                     val = pj.get("name", "")
-                elif field == "price":
+                elif field == "Price":
                     val = pj.get("pricing", "")
-                elif field == "rating":
+                elif field == "Rating":
                     val = pj.get("average_rating", "N/A")
-                elif field == "customers say":
+                elif field == "Customers Say":
                     val = pj.get("customers_say", "N/A")
-                elif field == "imageGallery":
+                elif field == "ImageGallery":
                     val = pj.get("images", [])
                 else:
                     val = pj.get(field, "N/A")
@@ -153,14 +153,14 @@ def render_product_column(idx, product, visible_fields):
 
             value = all_values[idx]
 
-            if field == "title":
+            if field == "Title":
                 value_str = str(value or "N/A")
                 st.markdown(
                     f"<div style='font-size: 14pt; font-weight: bold'>{value_str[:150]}{'...' if len(value_str)>150 else ''}</div>",
                     unsafe_allow_html=True
                 )
 
-            elif field == "price":
+            elif field == "Price":
                 price = product_data.get("pricing", "N/A")
                 current_price = None
                 if price not in (None, "N/A"):
@@ -195,7 +195,7 @@ def render_product_column(idx, product, visible_fields):
                 price_md = f"<div>💰<strong>{price}</strong>{product.get('price_diff_html', '')}</div>"
                 st.markdown(price_md, unsafe_allow_html=True)
 
-            elif field == "rating":
+            elif field == "Rating":
                 rating = product_data.get("average_rating", "N/A")
                 raw_count = product_data.get("total_reviews")
                 if isinstance(raw_count, int):
@@ -213,11 +213,11 @@ def render_product_column(idx, product, visible_fields):
 
                 st.markdown(rating_str, unsafe_allow_html=True)
 
-            elif field == "customers_say":
+            elif field == "Customers Say":
                 customer_summary = product_data.get("customers_say", {}).get("summary", "")
                 st.markdown(customer_summary)
 
-            elif field == "imageGallery":
+            elif field == "ImageGallery":
                 imgs = product_data.get("images", [])
                 # if imgs:
                 #     # Limit the number of images to display (4-5 per row)

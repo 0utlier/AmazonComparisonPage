@@ -242,7 +242,11 @@ def render_product_column(idx, product, visible_fields):
                     for img in imgs:
                         image_html += f'<img src="{img}" alt="product image">'
                     image_html += '</div>'
-            
+                    
+                    for i, img_url in enumerate(imgs[:1]):  # only first image shown
+                        with st.expander("🖼️ Click to enlarge"):
+                            st.image(img_url, use_container_width=True)
+
                     st.markdown(image_html, unsafe_allow_html=True)
 
             # elif field == "ImageGallery":

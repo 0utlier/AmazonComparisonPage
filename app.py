@@ -10,11 +10,12 @@ st.title("🛍️ Amazon Product Comparison")
 
 SCRAPER_API_KEY = "b1cd14dc050586097b7ea4d0d19652c8"
 
-DEFAULT_FIELDS = ["title", "price", "rating", "imageGallery"]
+DEFAULT_FIELDS = ["title", "price", "rating", "customers_say", "imageGallery"]
 ALL_FIELDS = [
     "title",
     "price",
     "rating",
+    "customers_say",
     "imageGallery",
     "description",
     "brand",
@@ -212,6 +213,18 @@ def render_product_column(idx, product, visible_fields):
                     rating_str += f" {total_pct}%<br>5⭐ {pct_5}% - 4⭐ {pct_4}%"
 
                 st.markdown(rating_str, unsafe_allow_html=True)
+
+            elif field == "customers_say":
+                customer_data = product_data.get("customers_say", [])
+                if customer_data and isinstance(customer_data, list):
+                    with st.expander("💬 What Customers Are Saying", expanded=True):
+                        for item in customer_data:
+                            summary = item.get("summary")
+                            count = item.get("mention_count")
+                            if summary:
+                                st.markdown(f"- **{summary}** ({count} mentions)")
+                else:
+                    st.write("No customer feedback summary available.")
 
             elif field == "imageGallery":
                 imgs = product_data.get("images", [])

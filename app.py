@@ -218,7 +218,8 @@ def render_product_column(idx, product, visible_fields):
                 customer_summary = product_data.get("customers_say", {}).get("summary", "")
                 st.markdown(customer_summary)
 
-            
+
+        
             elif field == "ImageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
@@ -263,9 +264,8 @@ def render_product_column(idx, product, visible_fields):
                     for i, img in enumerate(imgs):
                         image_html += f'<img src="{img}" alt="product image" onclick="openModal(\'{img}\')">'
                     image_html += '</div>'
-                    st.markdown(image_html, unsafe_allow_html=True)
-            
-                    # JavaScript for modal image expansion
+                    
+                    # Use st.components.v1.html to inject the HTML and JavaScript into the Streamlit app
                     modal_script = """
                         <script>
                         function openModal(imgSrc) {
@@ -293,7 +293,9 @@ def render_product_column(idx, product, visible_fields):
                         }
                         </script>
                     """
-                    st.markdown(modal_script, unsafe_allow_html=True)
+                    # Render the HTML and JavaScript in Streamlit using components.v1
+                    st.components.v1.html(image_html + modal_script, height=200)
+
 
 
             # elif field == "ImageGallery":

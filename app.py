@@ -67,6 +67,8 @@ def fetch_amazon_data(url):
 
 
 def render_product_column(idx, product, visible_fields):
+    update_all_pricing()
+
     col = st.columns([0.15, 0.55, 0.1, 0.15])  # Label, URL, Amazon, Refresh
 
     with col[0]:
@@ -221,6 +223,18 @@ def render_product_column(idx, product, visible_fields):
             else:
                 st.write(f"**{field.capitalize()}**: {value or 'N/A'}")
 
+# ----------- UPDATE other columns -----------
+def update_all_pricing():
+    for idx, product in enumerate(st.session_state.product_data):
+        product_data = product.get("json", {})
+        price = product_data.get("pricing", "N/A")
+
+        try:
+            current_price = float(str(price).replace("$", "").replace(",", ""))
+        except:
+            current_price = None
+
+        product["pricing_float"] = current_price
 
 # ----------- MAIN -----------
 # Note: sidebar is hidden but logic still applies if you expose it

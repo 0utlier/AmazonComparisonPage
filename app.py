@@ -228,15 +228,42 @@ def render_product_column(idx, product, visible_fields):
                 st.write(f"**{field.capitalize()}**: {value or 'N/A'}")
 
 # ----------- UPDATE other columns -----------
-def update_all_pricing():
-    for product in st.session_state.product_data:
-        product_data = product.get("json", {})
-        price = product_data.get("pricing", "N/A")
+def update_all_pricing_diffs():
+    products = st.session_state.product_data
 
+    # First, extract all float prices
+    prices = []
+    for product in products:
+        price_str = product.get("json", {}).get("pricing", "N/A")
         try:
-            product["pricing_float"] = float(str(price).replace("$", "").replace(",", ""))
+            price_val = float(str(price_str).replace("$", "").replace(",", ""))
         except:
-            product["pricing_float"] = None
+            price_val = None
+        product["pricing_float"] = price_val
+        prices.append(price_val)
+
+    # Now, compute comparison HTML per product
+    for idx, current_product in enumerate(products):
+        current_price = current_product.get("pricing_float")
+        if current_price is None:
+            current_product["price_diff_html"] = ""
+            continue
+
+        diffs_html = ""
+        for j, other_product in enumerate(products):
+            if j == idx:
+                continue
+            other_price = other_product.get("pricing_float")
+            if other_price is None:
+                continue
+            diff = current_price - other_price
+            diff_color = "green" if diff < 0 else "red" if diff > 0 else "gray"
+            diff_sign = "+" if diff > 0 else "-" if diff < 0 else "±"
+            diff_amount = f"${abs(diff):.2f}"
+            diffs_html += f"<br>[{j+1}]<span style='color:{diff_color};'> {diff_sign}{diff_amount}</span>"
+
+        current_product["price_diff_html"] = diffs_html
+
 
 
 # ----------- MAIN -----------
@@ -246,6 +273,8 @@ display_field_selector()
 if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
     st.session_state.num_columns += 1
     st.rerun()
+
+update_all_pricing_diffs()
 
 cols = st.columns(st.session_state.num_columns)
 

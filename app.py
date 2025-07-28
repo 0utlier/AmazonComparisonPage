@@ -69,7 +69,7 @@ def fetch_amazon_data(url):
 
 def render_product_column(idx, product, visible_fields):
     
-    col = st.columns([0.15, 0.45, 0.1, 0.15])  # Label, URL, Amazon, Refresh
+    col = st.columns([0.15, 0.65, 0.01, 0.15])  # Label, URL, Amazon, Refresh
 
     with col[0]:
         with st.popover(f"[{idx + 1}]", use_container_width=True):

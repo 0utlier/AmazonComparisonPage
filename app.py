@@ -107,7 +107,7 @@ def render_product_column(idx, product, visible_fields):
 
         with input_cols[1]:
             if st.button("REFRESH PRICES"):
-            update_all_pricing()
+                update_all_pricing()
             
 
         # Refresh only if URL changed

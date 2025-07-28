@@ -278,10 +278,10 @@ def render_product_column(idx, product, visible_fields):
                     # Build modal HTML for each image
                     for i, img in enumerate(imgs):
                         html += f"""
-                        <div id="modal{i}" class="modal" onclick="closeModal('{i}')">
-                            <span class="close" onclick="closeModal('{i}')">&times;</span>
-                            <img class="modal-content" src="{img}">
-                        </div>
+                            <div id="modal1" class="modal" onclick="closeModal('1')">
+                                <span class="close" onclick="event.stopPropagation(); closeModal('1')">&times;</span>
+                                <img class="modal-content" src="https://m.media-amazon.com/images/I/411OUrMGfZL.jpg" onclick="event.stopPropagation();">
+                            </div>
                         """
             
                     # Add JavaScript for modal functionality

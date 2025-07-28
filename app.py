@@ -161,9 +161,6 @@ def render_product_column(idx, product, visible_fields):
 
             elif field == "price":
                 price = product_data.get("pricing", "N/A")
-                price_md = f"<div>💰<strong>{price}</strong>{product.get('price_diff_html', '')}</div>"
-                st.markdown(price_md, unsafe_allow_html=True)
-                
                 current_price = None
                 if price not in (None, "N/A"):
                     try:
@@ -194,7 +191,8 @@ def render_product_column(idx, product, visible_fields):
                             continue
                     price_md += "".join(diffs)
 
-                price_md += "</div>"
+                # price_md += "</div>"
+                price_md = f"<div>💰<strong>{price}</strong>{product.get('price_diff_html', '')}</div>"
                 st.markdown(price_md, unsafe_allow_html=True)
 
             elif field == "rating":

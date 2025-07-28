@@ -218,7 +218,7 @@ def render_product_column(idx, product, visible_fields):
                 customer_summary = product_data.get("customers_say", {}).get("summary", "")
                 st.markdown(customer_summary)
 
-           elif field == "ImageGallery":
+            elif field == "ImageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
                     # Styles and modal functionality

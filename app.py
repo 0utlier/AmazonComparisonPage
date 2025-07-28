@@ -105,11 +105,6 @@ def render_product_column(idx, product, visible_fields):
                 label_visibility="collapsed"
             )
 
-        # with input_cols[1]:
-        #     if st.button("REFRESH PRICES"):
-        #         update_all_pricing()
-            
-
         # Refresh only if URL changed
         if url != product.get("url"):
             st.session_state.product_data[idx]["url"] = url
@@ -166,6 +161,9 @@ def render_product_column(idx, product, visible_fields):
 
             elif field == "price":
                 price = product_data.get("pricing", "N/A")
+                price_md = f"<div>💰<strong>{price}</strong>{product.get('price_diff_html', '')}</div>"
+                st.markdown(price_md, unsafe_allow_html=True)
+                
                 current_price = None
                 if price not in (None, "N/A"):
                     try:

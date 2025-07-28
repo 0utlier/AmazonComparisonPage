@@ -218,34 +218,97 @@ def render_product_column(idx, product, visible_fields):
                 customer_summary = product_data.get("customers_say", {}).get("summary", "")
                 st.markdown(customer_summary)
 
-            elif field == "ImageGallery":
+           elif field == "ImageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
-                    # Single horizontal scrollable row of same-sized images
+                    # Styles and modal functionality
                     scroll_style = """
                         <style>
                         .scrolling-wrapper {
                             display: flex;
                             overflow-x: auto;
                             padding-bottom: 10px;
+                            gap: 12px;
                         }
-                        .scrolling-wrapper img {
+                        .image-container {
+                            position: relative;
+                            flex: 0 0 auto;
+                        }
+                        .image-container img {
                             height: 150px;
-                            margin-right: 10px;
                             border-radius: 8px;
+                        }
+                        .expand-button {
+                            position: absolute;
+                            bottom: 6px;
+                            right: 6px;
+                            background-color: rgba(0,0,0,0.6);
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            padding: 4px 8px;
+                            font-size: 12px;
+                            cursor: pointer;
+                        }
+                        .modal {
+                            display: none;
+                            position: fixed;
+                            z-index: 1000;
+                            left: 0;
+                            top: 0;
+                            width: 100%;
+                            height: 100%;
+                            overflow: auto;
+                            background-color: rgba(0,0,0,0.8);
+                        }
+                        .modal-content {
+                            display: block;
+                            margin: 5% auto;
+                            max-width: 90%;
+                            max-height: 80%;
+                            border-radius: 10px;
+                        }
+                        .close {
+                            position: absolute;
+                            top: 20px;
+                            right: 35px;
+                            color: white;
+                            font-size: 40px;
+                            font-weight: bold;
+                            cursor: pointer;
                         }
                         </style>
                     """
-                    st.markdown(scroll_style, unsafe_allow_html=True)
             
-                    image_html = '<div class="scrolling-wrapper">'
-                    for img in imgs:
-                        image_html += f'<img src="{img}" alt="product image">'
-                        with st.expander("🖼️ Click to enlarge"):
-                            st.image(img, use_container_width=True)
-                    image_html += '</div>'
-                    
-                    st.markdown(image_html, unsafe_allow_html=True)
+                    modal_script = """
+                        <script>
+                        function openModal(id) {
+                            event.stopPropagation();
+                            document.getElementById(id).style.display = "block";
+                        }
+                        function closeModal(id) {
+                            event.stopPropagation();
+                            document.getElementById(id).style.display = "none";
+                        }
+                        </script>
+                    """
+            
+                    html = '<div class="scrolling-wrapper">'
+                    for i, img in enumerate(imgs):
+                        html += f"""
+                            <div class="image-container">
+                                <img src="{img}" alt="product image">
+                                <button class="expand-button" onclick="openModal('modal{i}')">Expand</button>
+                            </div>
+                            <div id="modal{i}" class="modal" onclick="closeModal('modal{i}')">
+                                <span class="close" onclick="closeModal('modal{i}')">&times;</span>
+                                <img class="modal-content" src="{img}" onclick="event.stopPropagation();">
+                            </div>
+                        """
+                    html += '</div>'
+            
+                    st.markdown(scroll_style + modal_script + html, unsafe_allow_html=True)
+
 
             # elif field == "ImageGallery":
             #         imgs = product_data.get("images", [])

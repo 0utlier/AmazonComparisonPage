@@ -192,7 +192,6 @@ def render_product_column(idx, product, visible_fields):
                             continue
                     price_md += "".join(diffs)
 
-                # price_md += "</div>"
                 price_md = f"<div>💰<strong>{price}</strong>{product.get('price_diff_html', '')}</div>"
                 st.markdown(price_md, unsafe_allow_html=True)
 
@@ -221,12 +220,18 @@ def render_product_column(idx, product, visible_fields):
             elif field == "imageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
-                    st.image(imgs, width=200, caption=None, use_container_width=True)
-                else:
-                    st.markdown("🖼️ No images found")
+                    # Limit the number of images to display (4-5 per row)
+                    img_per_row = 5
+                    rows = [imgs[i:i+img_per_row] for i in range(0, len(imgs), img_per_row)]
+                    for row in rows:
+                        cols = st.columns(len(row))
+                        for i, img in enumerate(row):
+                            with cols[i]:
+                                st.image(img, width=200, use_container_width=True)  # Adjust width as needed
 
             else:
                 st.write(f"**{field.capitalize()}**: {value or 'N/A'}")
+
 
 # ----------- UPDATE other columns -----------
 def update_all_pricing_diffs():

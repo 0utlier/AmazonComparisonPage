@@ -217,10 +217,12 @@ def render_product_column(idx, product, visible_fields):
                 st.markdown(rating_str, unsafe_allow_html=True)
             elif field == "customers_say":
                 value_str = str(value or "N/A")
-                st.markdown(
-                    f"<div style='font-size: 14pt; font-weight: bold'>{value_str[:150]}{'...' if len(value_str)>150 else ''}</div>",
-                    unsafe_allow_html=True
-                )
+                st.markdown(f"- **{summary}** ({count} mentions)")
+
+                # st.markdown(
+                #     f"<div style='font-size: 14pt; font-weight: bold'>{value_str[:150]}{'...' if len(value_str)>150 else ''}</div>",
+                #     unsafe_allow_html=True
+                # )
 
             # elif field == "customers_say":
             #     customer_data = product_data.get("customers_say", [])

@@ -242,7 +242,7 @@ def render_product_column(idx, product, visible_fields):
                     for img in imgs:
                         image_html += f'<img src="{img}" alt="product image">'
                         with st.expander("🖼️ Click to enlarge"):
-                            st.image(image_html, use_container_width=True)
+                            st.image(img, use_container_width=True)
                     image_html += '</div>'
                     
                     st.markdown(image_html, unsafe_allow_html=True)

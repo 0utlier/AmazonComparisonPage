@@ -1,6 +1,7 @@
 # v0.56
 import streamlit as st
 import requests
+import textwrap
 from urllib.parse import quote_plus
 
 # ✅ Sidebar starts collapsed, but user can expand it
@@ -220,8 +221,8 @@ def render_product_column(idx, product, visible_fields):
             elif field == "ImageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
-                    # Single horizontal scrollable row of same-sized images
-                    scroll_style = """
+                    # Inject styles for horizontal scrolling and modal
+                    st.markdown("""
                         <style>
                         .scrolling-wrapper {
                             display: flex;
@@ -232,17 +233,75 @@ def render_product_column(idx, product, visible_fields):
                             height: 150px;
                             margin-right: 10px;
                             border-radius: 8px;
+                            cursor: pointer;
+                            transition: transform 0.2s;
+                        }
+                        .scrolling-wrapper img:hover {
+                            transform: scale(1.05);
+                        }
+                        .modal {
+                            display: none;
+                            position: fixed;
+                            z-index: 1000;
+                            padding-top: 60px;
+                            left: 0;
+                            top: 0;
+                            width: 100%;
+                            height: 100%;
+                            overflow: auto;
+                            background-color: rgba(0,0,0,0.9);
+                        }
+                        .modal-content {
+                            margin: auto;
+                            display: block;
+                            max-width: 90%;
+                            max-height: 90%;
+                        }
+                        .close {
+                            position: absolute;
+                            top: 30px;
+                            right: 45px;
+                            color: #fff;
+                            font-size: 40px;
+                            font-weight: bold;
+                            cursor: pointer;
                         }
                         </style>
-                    """
-                    st.markdown(scroll_style, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
             
-                    image_html = '<div class="scrolling-wrapper">'
-                    for img in imgs:
-                        image_html += f'<img src="{img}" alt="product image">'
-                    image_html += '</div>'
+                    # Build the scrolling image row
+                    html = '<div class="scrolling-wrapper">'
+                    for i, img in enumerate(imgs):
+                        html += f'<img src="{img}" onclick="openModal(\'modal{i}\')">'
+                    html += '</div>'
             
-                    st.markdown(image_html, unsafe_allow_html=True)
+                    # Build modal HTML for each image
+                    for i, img in enumerate(imgs):
+                        html += f"""
+                        <div id="modal{i}" class="modal" onclick="closeModal('{i}')">
+                            <span class="close" onclick="closeModal('{i}')">&times;</span>
+                            <img class="modal-content" src="{img}">
+                        </div>
+                        """
+            
+                    # Add JavaScript for modal functionality
+                    html += textwrap.dedent("""
+                        <script>
+                        function openModal(id) {
+                            event.stopPropagation();
+                            document.getElementById(id).style.display = "block";
+                        }
+                        function closeModal(index) {
+                            event.stopPropagation();
+                            document.getElementById("modal" + index).style.display = "none";
+                        }
+                        </script>
+                    """)
+
+            
+                    st.markdown(html, unsafe_allow_html=True)
+
+
 
         # elif field == "ImageGallery":
             #     imgs = product_data.get("images", [])

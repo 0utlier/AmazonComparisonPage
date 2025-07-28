@@ -69,7 +69,7 @@ def fetch_amazon_data(url):
 
 def render_product_column(idx, product, visible_fields):
     
-    col = st.columns([0.15, 0.75, 0.15, 0.1])  # Label, URL, Amazon, Refresh
+    col = st.columns([0.18, 0.75, 0.12, 0.1])  # Label, URL, Amazon, Refresh
 
     with col[0]:
         with st.popover(f"[{idx + 1}]", use_container_width=True):
@@ -103,19 +103,6 @@ def render_product_column(idx, product, visible_fields):
             key=url_input_key,
             label_visibility="collapsed"
         )
-
-        # url_input_key = f"url_{idx}"
-        # default_url = product.get("url", "")
-        # input_cols = st.columns([4, 1])
-
-        # with input_cols[0]:
-        #     url = st.text_input(
-        #         "",
-        #         value=default_url,
-        #         placeholder="Paste Amazon product URL here",
-        #         key=url_input_key,
-        #         label_visibility="collapsed"
-        #     )
 
         # Refresh only if URL changed
         if url != product.get("url"):
@@ -223,7 +210,7 @@ def render_product_column(idx, product, visible_fields):
                 total_pct = pct_4 + pct_5
 
                 if pct_4 or pct_5:
-                    rating_str += f" {total_pct}%<br>5⭐ {pct_5}% // 4⭐ {pct_4}%"
+                    rating_str += f" {total_pct}%<br>5⭐ {pct_5}% && 4⭐ {pct_4}%"
 
                 st.markdown(rating_str, unsafe_allow_html=True)
 

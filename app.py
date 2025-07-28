@@ -224,7 +224,7 @@ def render_product_column(idx, product, visible_fields):
             elif field == "ImageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
-                    # Style for the scrolling gallery
+                    # Style for the scrolling gallery and the modal
                     scroll_style = """
                         <style>
                         .scrolling-wrapper {
@@ -257,11 +257,44 @@ def render_product_column(idx, product, visible_fields):
                             position: relative;
                             display: inline-block;
                         }
+                        /* Modal styling */
+                        .modal {
+                            display: none;
+                            position: fixed;
+                            z-index: 1;
+                            left: 0;
+                            top: 0;
+                            width: 100%;
+                            height: 100%;
+                            overflow: auto;
+                            background-color: rgba(0, 0, 0, 0.8);
+                        }
+                        .modal-content {
+                            position: relative;
+                            margin: auto;
+                            top: 50%;
+                            transform: translateY(-50%);
+                            width: 70%;
+                            max-width: 700px;
+                        }
+                        .modal-content img {
+                            width: 100%;
+                            height: auto;
+                            border-radius: 8px;
+                        }
+                        .close-btn {
+                            position: absolute;
+                            top: 10px;
+                            right: 10px;
+                            font-size: 30px;
+                            color: white;
+                            cursor: pointer;
+                        }
                         </style>
                     """
                     st.markdown(scroll_style, unsafe_allow_html=True)
             
-                    # HTML for the image gallery
+                    # HTML for the image gallery with expand buttons
                     image_html = '<div class="scrolling-wrapper">'
                     for i, img in enumerate(imgs):
                         image_html += f'''
@@ -272,9 +305,10 @@ def render_product_column(idx, product, visible_fields):
                         '''
                     image_html += '</div>'
             
-                    # JavaScript for modal behavior (open image in a modal and close with ESC key)
+                    # JavaScript for modal behavior
                     modal_script = """
                         <script>
+                        // Function to open the modal
                         function openModal(imgSrc) {
                             // Create modal element if not already created
                             if (!document.getElementById('modal')) {
@@ -283,14 +317,21 @@ def render_product_column(idx, product, visible_fields):
                                 modal.classList.add('modal');
                                 document.body.appendChild(modal);
                                 
-                                // Add close event to the modal
-                                modal.addEventListener('click', function() {
+                                // Modal content area
+                                const modalContent = document.createElement('div');
+                                modalContent.classList.add('modal-content');
+                                modal.appendChild(modalContent);
+                                
+                                // Close button for modal
+                                const closeBtn = document.createElement('span');
+                                closeBtn.classList.add('close-btn');
+                                closeBtn.innerHTML = '&times;';
+                                modalContent.appendChild(closeBtn);
+                                
+                                // Add close event to the close button
+                                closeBtn.addEventListener('click', function() {
                                     modal.style.display = 'none';
                                 });
-                                
-                                // Insert image in modal
-                                const modalImg = document.createElement('img');
-                                modal.appendChild(modalImg);
                                 
                                 // Add ESC key event listener to close modal
                                 document.addEventListener('keydown', function(e) {
@@ -302,15 +343,18 @@ def render_product_column(idx, product, visible_fields):
                             
                             // Show the modal and set the image source
                             const modal = document.getElementById('modal');
-                            const modalImg = modal.querySelector('img');
+                            const modalImg = document.createElement('img');
+                            modal.querySelector('.modal-content').appendChild(modalImg);
                             modalImg.src = imgSrc;
-                            modal.style.display = 'flex';
+                            modal.style.display = 'block';
                         }
                         </script>
                     """
-                    # Render the image gallery and modal script in Streamlit
+                    
+                    # Render the image gallery and modal script
                     st.markdown(image_html, unsafe_allow_html=True)
                     st.markdown(modal_script, unsafe_allow_html=True)
+
 
 
 

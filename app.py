@@ -9,6 +9,7 @@ st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 
 st.title("🛍️ Amazon Product Comparison")
 
+# https://adguard.com/en/adguard-temp-mail/overview.html
 SCRAPER_API_KEY = "771210aa61ca06b41d1ff8216dc27361"
 
 DEFAULT_FIELDS = ["Title", "Price", "Rating", "Customers Say", "ImageGallery"]

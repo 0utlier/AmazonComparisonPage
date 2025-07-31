@@ -9,7 +9,7 @@ st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 
 st.title("🛍️ Amazon Product Comparison")
 
-SCRAPER_API_KEY = "b1cd14dc050586097b7ea4d0d19652c8"
+SCRAPER_API_KEY = "771210aa61ca06b41d1ff8216dc27361"
 
 DEFAULT_FIELDS = ["Title", "Price", "Rating", "Customers Say", "ImageGallery"]
 ALL_FIELDS = [

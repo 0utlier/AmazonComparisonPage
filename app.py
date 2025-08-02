@@ -211,7 +211,7 @@ def render_product_column(idx, product, visible_fields):
                 total_pct = pct_4 + pct_5
 
                 if pct_4 or pct_5:
-                    rating_str += f" {total_pct}%<br>5⭐ {pct_5}% && 4⭐ {pct_4}%"
+                    rating_str += f" {total_pct}%<br>5⭐ {pct_5}%     4⭐ {pct_4}%"
 
                 st.markdown(rating_str, unsafe_allow_html=True)
 

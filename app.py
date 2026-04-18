@@ -1,11 +1,10 @@
-# v0.59 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
+# v0.60 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
 #
 # requirements.txt:
 #   streamlit
 #   curl_cffi
 #   beautifulsoup4
 
-import json
 import re
 import streamlit as st
 from curl_cffi import requests as cf_requests
@@ -65,57 +64,20 @@ def display_field_selector():
 # ─────────────────────────────────────────────────────────────
 def _parse_star_percentages(soup: BeautifulSoup) -> dict:
     """
-    Amazon's histogram rows each carry a data-reviews-state-param JSON attribute
-    like {"filterByStar":"five_star","pageNumber":"1"}.
-    The percentage lives in the aria-label of the last <td>'s <a> tag,
-    e.g. aria-label="86% of reviews have 5 stars", or as plain text.
-    Falls back to .a-meter[aria-label] bars if rows give nothing.
+    Amazon now renders the histogram as a <ul id="histogramTable"> where
+    each <li> contains an <a> whose aria-label reads:
+      "62 percent of reviews have 5 stars"
+    We parse both the percentage and the star number directly from that string.
     """
-    star_map = {
-        "five_star": 5,
-        "four_star": 4,
-        "three_star": 3,
-        "two_star": 2,
-        "one_star": 1,
-    }
     result = {}
-
-    for row in soup.select("#histogramTable tr[data-reviews-state-param]"):
-        try:
-            state = json.loads(row.get("data-reviews-state-param", "{}"))
-            filter_star = state.get("filterByStar", "")
-            star_num = star_map.get(filter_star)
-            if not star_num:
-                continue
-
-            # aria-label is most reliable: "86% of reviews have 5 stars"
-            pct_el = row.select_one("td:last-child a")
-            if pct_el:
-                text = pct_el.get("aria-label", "") or pct_el.get_text(strip=True)
-                match = re.search(r"(\d+)", text)
-                if match:
-                    result[f"{star_num}_star_percentage"] = int(match.group(1))
-        except Exception:
-            continue
-
-    # Fallback: .a-meter bars with aria-label percentage
-    if not result:
-        for bar in soup.select(".a-meter[aria-label]"):
-            aria = bar.get("aria-label", "")
-            match = re.search(r"(\d+)", aria)
-            if not match:
-                continue
+    for a in soup.select("#histogramTable li a[aria-label]"):
+        label = a.get("aria-label", "")
+        # e.g. "62 percent of reviews have 5 stars"
+        match = re.search(r"(\d+)\s+percent.*?(\d+)\s+star", label, re.IGNORECASE)
+        if match:
             pct = int(match.group(1))
-            row = bar.find_parent("tr")
-            if row:
-                try:
-                    state = json.loads(row.get("data-reviews-state-param", "{}"))
-                    star_num = star_map.get(state.get("filterByStar", ""))
-                    if star_num:
-                        result[f"{star_num}_star_percentage"] = pct
-                except Exception:
-                    continue
-
+            star = int(match.group(2))
+            result[f"{star}_star_percentage"] = pct
     return result
 
 
@@ -342,7 +304,7 @@ def render_product_column(idx, product, visible_fields):
         if "_error" in product_data:
             st.warning(f"⚠️ Scrape error: {product_data['_error']}")
 
-        # ── Debug expander — shows raw scraped values + histogram HTML ──
+        # ── Debug expander ─────────────────────────────────
         with st.expander("🔍 Debug", expanded=False):
             debug_keys = [
                 "name", "pricing", "average_rating", "total_reviews",
@@ -352,7 +314,10 @@ def render_product_column(idx, product, visible_fields):
             for k in debug_keys:
                 st.write(f"**{k}:** `{product_data.get(k, 'not found')}`")
             st.write("**histogram HTML (first 2000 chars):**")
-            st.code(product_data.get("_debug_histogram_html", "not captured"), language="html")
+            st.code(
+                product_data.get("_debug_histogram_html", "not captured"),
+                language="html",
+            )
 
         st.session_state.product_data[idx]["pricing"] = product_data.get("pricing", "N/A")
         st.session_state.product_data[idx]["average_rating"] = product_data.get(

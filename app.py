@@ -345,29 +345,43 @@ def render_field_cell(field, product):
         st.warning(f"⚠️ {product_data['_error']}")
         return
 
-    if field == "Title":
-        value_str = str(product_data.get("name") or "N/A")
+    def _na(label):
+        """Render a styled 'Label: N/A' placeholder."""
         st.markdown(
-            f"<div style='font-size:14pt;font-weight:bold'>"
-            f"{value_str[:150]}{'...' if len(value_str) > 150 else ''}</div>",
+            f"<span style='color:#666;font-size:0.9em'>{label}: "
+            f"<em>not available</em></span>",
             unsafe_allow_html=True,
         )
+
+    if field == "Title":
+        value_str = str(product_data.get("name") or "")
+        if not value_str or value_str == "N/A":
+            _na("Title")
+        else:
+            st.markdown(
+                f"<div style='font-size:14pt;font-weight:bold'>"
+                f"{value_str[:150]}{'...' if len(value_str) > 150 else ''}</div>",
+                unsafe_allow_html=True,
+            )
 
     elif field == "Price":
-        price     = product_data.get("pricing", "N/A")
+        price     = product_data.get("pricing", "")
         diff_html = product.get("price_diff_html", "")
-        st.markdown(
-            f"<div>💰 <strong>{price}</strong> &nbsp;{diff_html}</div>",
-            unsafe_allow_html=True,
-        )
+        if not price or price == "N/A":
+            _na("Price")
+        else:
+            st.markdown(
+                f"<div>💰 <strong>{price}</strong> &nbsp;{diff_html}</div>",
+                unsafe_allow_html=True,
+            )
 
     elif field == "Rating":
-        rating      = product_data.get("average_rating", "N/A")
+        rating      = product_data.get("average_rating", "")
         raw_count   = product_data.get("total_reviews")
         count_str   = (
             f"{(raw_count // 100) * 100}+" if isinstance(raw_count, int) and raw_count >= 100
             else str(raw_count) if isinstance(raw_count, int)
-            else "N/A"
+            else None
         )
         pct_4    = int(product_data.get("4_star_percentage") or 0)
         pct_5    = int(product_data.get("5_star_percentage") or 0)
@@ -376,26 +390,35 @@ def render_field_cell(field, product):
         r_diff   = product.get("rating_diff_html", "")
         pos_diff = product.get("positive_pct_diff_html", "")
 
-        lines = f"⭐ <strong>{rating}</strong> &nbsp; [👤 {count_str}]"
-        if r_diff:
-            lines += f"<br><span style='font-size:0.85em'>{r_diff}</span>"
-        if pct_4 or pct_5:
-            lines += (
-                f"<br><br>"
-                f"[5⭐ &thinsp;{pct_5}%] &nbsp;+&nbsp; [4⭐ &thinsp;{pct_4}%]"
-                f" &nbsp;—&nbsp; <em>({combined}% positive)</em>"
-            )
-            if pos_diff:
-                lines += f"<br><span style='font-size:0.85em'>{pos_diff}</span>"
+        if not rating or rating == "N/A":
+            _na("Rating")
+        else:
+            lines = f"⭐ <strong>{rating}</strong>"
+            lines += f" &nbsp; [👤 {count_str}]" if count_str else " &nbsp; [👤 not available]"
+            if r_diff:
+                lines += f"<br><span style='font-size:0.85em'>{r_diff}</span>"
+            if pct_4 or pct_5:
+                lines += (
+                    f"<br><br>"
+                    f"[5⭐ &thinsp;{pct_5}%] &nbsp;+&nbsp; [4⭐ &thinsp;{pct_4}%]"
+                    f" &nbsp;—&nbsp; <em>({combined}% positive)</em>"
+                )
+                if pos_diff:
+                    lines += f"<br><span style='font-size:0.85em'>{pos_diff}</span>"
+            else:
+                lines += f"<br><span style='color:#666;font-size:0.85em'><em>Star breakdown: not available</em></span>"
 
-        st.markdown(
-            f"<div style='line-height:1.9'>{lines}</div>",
-            unsafe_allow_html=True,
-        )
+            st.markdown(
+                f"<div style='line-height:1.9'>{lines}</div>",
+                unsafe_allow_html=True,
+            )
 
     elif field == "Customers Say":
-        summary = (product_data.get("customers_say") or {}).get("summary", "N/A")
-        st.markdown(summary)
+        summary = (product_data.get("customers_say") or {}).get("summary", "")
+        if not summary or summary == "N/A":
+            _na("Customers say")
+        else:
+            st.markdown(summary)
 
     elif field == "ImageGallery":
         imgs = product_data.get("images", [])
@@ -410,14 +433,21 @@ def render_field_cell(field, product):
                 + "</div>",
                 unsafe_allow_html=True,
             )
+        else:
+            _na("Images")
 
     else:
-        value = product_data.get(field.lower(), "N/A")
+        value = product_data.get(field.lower(), "")
         if isinstance(value, list):
-            for item in value:
-                st.markdown(f"• {item}")
+            if value:
+                for item in value:
+                    st.markdown(f"• {item}")
+            else:
+                _na(field)
+        elif not value or value == "N/A":
+            _na(field)
         else:
-            st.write(value or "N/A")
+            st.write(value)
 
 
 # ─────────────────────────────────────────────────────────────

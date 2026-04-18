@@ -1,4 +1,4 @@
-# v0.64 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
+# v0.65 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
 #
 # requirements.txt:
 #   streamlit
@@ -43,23 +43,38 @@ if "product_data"    not in st.session_state: st.session_state.product_data    =
 if "num_columns"     not in st.session_state: st.session_state.num_columns     = 2
 if "show_debug"      not in st.session_state: st.session_state.show_debug      = False
 
+# Initialise checkbox keys so buttons can override them before widgets render
+def _sync_checkboxes_to_visible():
+    """Push visible_fields into the individual chk_ keys so widgets reflect state."""
+    for field in ALL_FIELDS:
+        st.session_state[f"chk_{field}"] = field in st.session_state.visible_fields
+
 
 # ─────────────────────────────────────────────────────────────
 # Sidebar
 # ─────────────────────────────────────────────────────────────
 def display_field_selector():
     with st.sidebar.expander("DISPLAY OPTIONS", expanded=True):
+
         if st.button("✅ Default Options"):
             st.session_state.visible_fields = DEFAULT_FIELDS.copy()
+            _sync_checkboxes_to_visible()
+
         if st.button("🔁 ALL / NONE"):
-            st.session_state.visible_fields = (
-                [] if len(st.session_state.visible_fields) == len(ALL_FIELDS)
-                else ALL_FIELDS.copy()
-            )
+            all_selected = len(st.session_state.visible_fields) == len(ALL_FIELDS)
+            st.session_state.visible_fields = [] if all_selected else ALL_FIELDS.copy()
+            _sync_checkboxes_to_visible()
+
         new_visible = []
         for field in ALL_FIELDS:
-            if st.checkbox(field, value=field in st.session_state.visible_fields, key=f"chk_{field}"):
+            # Initialise key on first render so it exists before the widget
+            if f"chk_{field}" not in st.session_state:
+                st.session_state[f"chk_{field}"] = field in st.session_state.visible_fields
+
+            if st.checkbox(field, key=f"chk_{field}"):
                 new_visible.append(field)
+
+        # Keep visible_fields in sync with manual checkbox clicks
         st.session_state.visible_fields = new_visible
 
     with st.sidebar.expander("DEBUG", expanded=False):
@@ -133,16 +148,22 @@ def fetch_amazon_data(url: str) -> dict:
                     imgs = [main["src"]]
             data["images"] = imgs
 
+        # ── Customers Say — updated selectors ──────────────────
         customers_say = "N/A"
         for sel in (
+            "[data-testid='overall-summary']",          # primary (current Amazon layout)
             "[data-hook='cr-insights-widget-summary']",
             ".cr-lighthouse-summary",
             "[data-hook='cr-insights-widget-aspects']",
         ):
             el = soup.select_one(sel)
             if el:
-                customers_say = el.get_text(strip=True)
-                break
+                text = el.get_text(strip=True)
+                # Strip the "Customers say" heading if captured alongside the summary
+                text = re.sub(r"^Customers\s+say\s*", "", text, flags=re.IGNORECASE).strip()
+                if text:
+                    customers_say = text
+                    break
         data["customers_say"] = {"summary": customers_say}
 
         brand = soup.select_one("#bylineInfo")
@@ -260,7 +281,6 @@ def update_all_diffs():
 def render_header(idx, product):
     num_cols = st.session_state.num_columns
 
-    # Popover label — wider so [1], [2] etc. never wraps
     label_col, url_col = st.columns([1, 6])
     with label_col:
         with st.popover(f" {idx + 1} ", use_container_width=True):
@@ -290,14 +310,12 @@ def render_header(idx, product):
             key=f"url_{idx}", label_visibility="collapsed",
         )
 
-    # Detect URL change
     if url != product.get("url"):
         st.session_state.product_data[idx]["url"] = url
         st.session_state.product_data[idx].pop("json", None)
         st.rerun()
     st.session_state.product_data[idx]["url"] = url
 
-    # Action buttons row — Amazon link uses <a> so it actually opens a new tab
     btn_l, btn_r = st.columns(2)
     with btn_l:
         if url:
@@ -321,7 +339,6 @@ def render_header(idx, product):
             st.session_state.product_data[idx].pop("json", None)
             st.rerun()
 
-    # Trigger load if URL present but data missing
     if url and "json" not in product:
         with st.spinner("Loading…"):
             st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
@@ -346,7 +363,6 @@ def render_field_cell(field, product):
         return
 
     def _na(label):
-        """Render a styled 'Label: N/A' placeholder."""
         st.markdown(
             f"<span style='color:#666;font-size:0.9em'>{label}: "
             f"<em>not available</em></span>",
@@ -459,7 +475,6 @@ if st.button("➕ Add Product Column"):
     st.session_state.num_columns += 1
     st.rerun()
 
-# Ensure product_data list is long enough
 while len(st.session_state.product_data) < st.session_state.num_columns:
     st.session_state.product_data.append({"url": ""})
 
@@ -468,14 +483,12 @@ update_all_diffs()
 num_cols = st.session_state.num_columns
 products = st.session_state.product_data
 
-# ── Header row (URL inputs + controls) — one cell per product ─
 st.markdown("<div class='field-divider'></div>", unsafe_allow_html=True)
 header_cols = st.columns(num_cols)
 for i in range(num_cols):
     with header_cols[i]:
         render_header(i, products[i])
 
-# ── Field rows — rendered field-by-field so heights align ─────
 for field in ALL_FIELDS:
     if field not in st.session_state.visible_fields:
         continue
@@ -486,7 +499,7 @@ for field in ALL_FIELDS:
             render_field_cell(field, products[i])
 
 # ─────────────────────────────────────────────────────────────
-# Debug panel — bottom, opt-in via sidebar
+# Debug panel
 # ─────────────────────────────────────────────────────────────
 if st.session_state.show_debug:
     st.divider()

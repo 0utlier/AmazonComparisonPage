@@ -1,24 +1,14 @@
-# v0.57 — Playwright + stealth (no ScraperAPI)
+# v0.58 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
 #
-# Install dependencies:
-#   pip install streamlit playwright playwright-stealth
-#   playwright install chromium
+# requirements.txt:
+#   streamlit
+#   curl_cffi
+#   beautifulsoup4
 
 import re
 import streamlit as st
-from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth_sync
-
-import subprocess, sys
-
-@st.cache_resource(show_spinner=False)
-def _install_playwright():
-    subprocess.run(
-        [sys.executable, "-m", "playwright", "install", "chromium"],
-        check=True, capture_output=True
-    )
-
-_install_playwright()
+from curl_cffi import requests as cf_requests
+from bs4 import BeautifulSoup
 
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 st.title("🛍️ Amazon Product Comparison")
@@ -70,172 +60,111 @@ def display_field_selector():
 
 
 # ─────────────────────────────────────────────────────────────
-# Scraper  (replaces ScraperAPI)
+# Scraper
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def fetch_amazon_data(url: str) -> dict:
-    """Scrape an Amazon product page with Playwright + stealth."""
+    """Fetch and parse an Amazon product page using curl_cffi (Chrome TLS impersonation)."""
     data: dict = {}
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(
-                user_agent=(
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/123.0.0.0 Safari/537.36"
-                ),
-                viewport={"width": 1280, "height": 800},
-                locale="en-US",
-            )
-            page = context.new_page()
-            stealth_sync(page)
+        r = cf_requests.get(
+            url,
+            impersonate="chrome120",
+            timeout=20,
+            headers={"Accept-Language": "en-US,en;q=0.9"},
+        )
+        soup = BeautifulSoup(r.text, "html.parser")
 
-            page.goto(url, wait_until="domcontentloaded", timeout=30_000)
-            page.wait_for_timeout(2000)  # let JS settle
+        # ── Title ──────────────────────────────────────────
+        title = soup.select_one("#productTitle")
+        data["name"] = title.get_text(strip=True) if title else "N/A"
 
-            # ── Title ──────────────────────────────────────
-            try:
-                data["name"] = page.locator("#productTitle").inner_text(timeout=5000).strip()
-            except Exception:
-                data["name"] = "N/A"
+        # ── Price ──────────────────────────────────────────
+        price = soup.select_one(".a-price .a-offscreen")
+        data["pricing"] = price.get_text(strip=True) if price else "N/A"
 
-            # ── Price ──────────────────────────────────────
-            try:
-                data["pricing"] = (
-                    page.locator(".a-price .a-offscreen")
-                    .first.inner_text(timeout=5000)
-                    .strip()
-                )
-            except Exception:
-                data["pricing"] = "N/A"
+        # ── Rating ─────────────────────────────────────────
+        rating = soup.select_one("#acrPopover")
+        data["average_rating"] = (
+            rating["title"].split()[0]
+            if rating and rating.get("title")
+            else "N/A"
+        )
 
-            # ── Rating ─────────────────────────────────────
-            try:
-                title_attr = page.locator("#acrPopover").get_attribute(
-                    "title", timeout=5000
-                )
-                data["average_rating"] = (
-                    title_attr.split(" ")[0] if title_attr else "N/A"
-                )
-            except Exception:
-                data["average_rating"] = "N/A"
+        # ── Total Reviews ──────────────────────────────────
+        reviews = soup.select_one("#acrCustomerReviewText")
+        if reviews:
+            data["total_reviews"] = int(re.sub(r"[^\d]", "", reviews.get_text()))
+        else:
+            data["total_reviews"] = None
 
-            # ── Total Reviews ──────────────────────────────
-            try:
-                raw = page.locator("#acrCustomerReviewText").inner_text(timeout=5000)
-                data["total_reviews"] = int(re.sub(r"[^\d]", "", raw))
-            except Exception:
-                data["total_reviews"] = None
+        # ── Star Percentages ───────────────────────────────
+        for row in soup.select("table#histogramTable tr"):
+            label = row.select_one("td:first-child a")
+            pct = row.select_one("td:last-child")
+            if label and pct:
+                star = re.search(r"\d+", label.get_text())
+                pct_val = pct.get_text(strip=True).replace("%", "")
+                if star and pct_val.isdigit():
+                    data[f"{star.group()}_star_percentage"] = int(pct_val)
 
-            # ── Star Percentages ───────────────────────────
-            try:
-                rows = page.locator("table#histogramTable tr").all()
-                for row in rows:
-                    label = row.locator("td:first-child a").inner_text(timeout=2000).strip()
-                    pct = (
-                        row.locator("td:last-child")
-                        .inner_text(timeout=2000)
-                        .strip()
-                        .replace("%", "")
-                    )
-                    star = re.search(r"\d+", label)
-                    if star and pct.isdigit():
-                        data[f"{star.group()}_star_percentage"] = int(pct)
-            except Exception:
-                pass
+        # ── Images ─────────────────────────────────────────
+        matches = re.findall(r'"hiRes":"(https://[^"]+)"', r.text)
+        if matches:
+            data["images"] = list(dict.fromkeys(matches))
+        else:
+            # Fallback: thumbnail strip src → upscale URL
+            imgs = []
+            for el in soup.select("#altImages img"):
+                src = el.get("src", "")
+                large = re.sub(r"\._[A-Z0-9_,]+_\.", "._AC_SL1500_.", src)
+                if large.startswith("https"):
+                    imgs.append(large)
+            if not imgs:
+                main = soup.select_one("#landingImage")
+                if main and main.get("src"):
+                    imgs = [main["src"]]
+            data["images"] = imgs
 
-            # ── Images ─────────────────────────────────────
-            try:
-                imgs: list[str] = []
-                # Prefer hi-res URLs embedded in page source
-                html = page.content()
-                matches = re.findall(r'"hiRes":"(https://[^"]+)"', html)
-                if matches:
-                    imgs = list(dict.fromkeys(matches))  # dedupe, preserve order
-                else:
-                    # Fallback: thumbnail strip → upscale
-                    for el in page.locator("#altImages img").all():
-                        src = el.get_attribute("src") or ""
-                        large = re.sub(r"\._[A-Z0-9_,]+_\.", "._AC_SL1500_.", src)
-                        if large.startswith("https"):
-                            imgs.append(large)
-                    if not imgs:
-                        main = page.locator("#landingImage").get_attribute(
-                            "src", timeout=5000
-                        )
-                        if main:
-                            imgs = [main]
-                data["images"] = imgs
-            except Exception:
-                data["images"] = []
+        # ── Customers Say (AI summary) ─────────────────────
+        customers_say = "N/A"
+        for sel in (
+            "[data-hook='cr-insights-widget-summary']",
+            ".cr-lighthouse-summary",
+            "[data-hook='cr-insights-widget-aspects']",
+        ):
+            el = soup.select_one(sel)
+            if el:
+                customers_say = el.get_text(strip=True)
+                break
+        data["customers_say"] = {"summary": customers_say}
 
-            # ── Customers Say (AI summary) ─────────────────
-            try:
-                for selector in (
-                    "[data-hook='cr-insights-widget-summary']",
-                    ".cr-lighthouse-summary",
-                    "[data-hook='cr-insights-widget-aspects']",
-                ):
-                    el = page.locator(selector)
-                    if el.count():
-                        data["customers_say"] = {
-                            "summary": el.first.inner_text(timeout=5000).strip()
-                        }
-                        break
-                else:
-                    data["customers_say"] = {"summary": "N/A"}
-            except Exception:
-                data["customers_say"] = {"summary": "N/A"}
+        # ── Brand ──────────────────────────────────────────
+        brand = soup.select_one("#bylineInfo")
+        data["brand"] = brand.get_text(strip=True) if brand else "N/A"
 
-            # ── Brand ──────────────────────────────────────
-            try:
-                data["brand"] = page.locator("#bylineInfo").inner_text(timeout=5000).strip()
-            except Exception:
-                data["brand"] = "N/A"
+        # ── Availability ───────────────────────────────────
+        avail = soup.select_one("#availability span")
+        data["availability"] = avail.get_text(strip=True) if avail else "N/A"
 
-            # ── Availability ───────────────────────────────
-            try:
-                data["availability"] = (
-                    page.locator("#availability span")
-                    .first.inner_text(timeout=5000)
-                    .strip()
-                )
-            except Exception:
-                data["availability"] = "N/A"
+        # ── Features ───────────────────────────────────────
+        data["features"] = [
+            li.get_text(strip=True)
+            for li in soup.select("#feature-bullets li span.a-list-item")
+            if li.get_text(strip=True)
+        ]
 
-            # ── Features ───────────────────────────────────
-            try:
-                els = page.locator("#feature-bullets li span.a-list-item").all()
-                data["features"] = [
-                    e.inner_text().strip() for e in els if e.inner_text().strip()
-                ]
-            except Exception:
-                data["features"] = []
+        # ── Description ────────────────────────────────────
+        desc = soup.select_one("#productDescription")
+        data["description"] = desc.get_text(strip=True) if desc else "N/A"
 
-            # ── Description ────────────────────────────────
-            try:
-                data["description"] = (
-                    page.locator("#productDescription").inner_text(timeout=5000).strip()
-                )
-            except Exception:
-                data["description"] = "N/A"
-
-            # ── Categories ─────────────────────────────────
-            try:
-                crumbs = page.locator(
-                    "#wayfinding-breadcrumbs_container li span"
-                ).all()
-                cats = [
-                    c.inner_text().strip()
-                    for c in crumbs
-                    if c.inner_text().strip() not in ("", "›")
-                ]
-                data["categories"] = " > ".join(cats) if cats else "N/A"
-            except Exception:
-                data["categories"] = "N/A"
-
-            browser.close()
+        # ── Categories ─────────────────────────────────────
+        crumbs = [
+            c.get_text(strip=True)
+            for c in soup.select("#wayfinding-breadcrumbs_container li span")
+            if c.get_text(strip=True) not in ("", "›")
+        ]
+        data["categories"] = " > ".join(crumbs) if crumbs else "N/A"
 
     except Exception as exc:
         data["_error"] = str(exc)
@@ -350,7 +279,6 @@ def render_product_column(idx, product, visible_fields):
 
         product_data = st.session_state.product_data[idx].get("json", {})
 
-        # surface a scrape error if one occurred
         if "_error" in product_data:
             st.warning(f"⚠️ Scrape error: {product_data['_error']}")
 
@@ -360,7 +288,6 @@ def render_product_column(idx, product, visible_fields):
         )
 
         for field in visible_fields:
-            value = None
             if field == "Title":
                 value = product_data.get("name", "")
             elif field == "Price":
@@ -397,7 +324,9 @@ def render_product_column(idx, product, visible_fields):
                 raw_count = product_data.get("total_reviews")
                 if isinstance(raw_count, int):
                     count_display = (
-                        f"{(raw_count // 100) * 100}+" if raw_count >= 100 else str(raw_count)
+                        f"{(raw_count // 100) * 100}+"
+                        if raw_count >= 100
+                        else str(raw_count)
                     )
                 else:
                     count_display = "N/A"
@@ -407,7 +336,6 @@ def render_product_column(idx, product, visible_fields):
                 pct_5 = int(product_data.get("5_star_percentage", 0))
                 if pct_4 or pct_5:
                     rating_str += f" {pct_4 + pct_5}%<br>5⭐ {pct_5}%     4⭐ {pct_4}%"
-
                 st.markdown(rating_str, unsafe_allow_html=True)
 
             elif field == "Customers Say":
@@ -417,7 +345,8 @@ def render_product_column(idx, product, visible_fields):
             elif field == "ImageGallery":
                 imgs = product_data.get("images", [])
                 if imgs:
-                    scroll_style = """
+                    st.markdown(
+                        """
                         <style>
                         .scrolling-wrapper {
                             display: flex;
@@ -430,8 +359,9 @@ def render_product_column(idx, product, visible_fields):
                             border-radius: 8px;
                         }
                         </style>
-                    """
-                    st.markdown(scroll_style, unsafe_allow_html=True)
+                        """,
+                        unsafe_allow_html=True,
+                    )
                     image_html = '<div class="scrolling-wrapper">'
                     for img in imgs:
                         image_html += f'<img src="{img}" alt="product image">'
@@ -458,4 +388,6 @@ for i in range(st.session_state.num_columns):
     if i >= len(st.session_state.product_data):
         st.session_state.product_data.append({"url": ""})
     with cols[i]:
-        render_product_column(i, st.session_state.product_data[i], st.session_state.visible_fields)
+        render_product_column(
+            i, st.session_state.product_data[i], st.session_state.visible_fields
+        )

@@ -1,4 +1,4 @@
-# v0.61 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
+# v0.62 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
 #
 # requirements.txt:
 #   streamlit
@@ -33,6 +33,8 @@ if "product_data" not in st.session_state:
     st.session_state.product_data = []
 if "num_columns" not in st.session_state:
     st.session_state.num_columns = 2
+if "show_debug" not in st.session_state:
+    st.session_state.show_debug = False
 
 
 # ─────────────────────────────────────────────────────────────
@@ -49,14 +51,19 @@ def display_field_selector():
             else:
                 st.session_state.visible_fields = ALL_FIELDS.copy()
 
+        # Render checkboxes in fixed ALL_FIELDS order and update a set —
+        # never append/remove, so the order never drifts.
+        new_visible = []
         for field in ALL_FIELDS:
             checked = field in st.session_state.visible_fields
             if st.checkbox(field, value=checked, key=f"chk_{field}"):
-                if field not in st.session_state.visible_fields:
-                    st.session_state.visible_fields.append(field)
-            else:
-                if field in st.session_state.visible_fields:
-                    st.session_state.visible_fields.remove(field)
+                new_visible.append(field)
+        st.session_state.visible_fields = new_visible
+
+    with st.sidebar.expander("DEBUG", expanded=False):
+        st.session_state.show_debug = st.checkbox(
+            "Show debug panel", value=st.session_state.show_debug, key="chk_debug"
+        )
 
 
 # ─────────────────────────────────────────────────────────────
@@ -65,12 +72,8 @@ def display_field_selector():
 def _parse_star_percentages(soup: BeautifulSoup) -> dict:
     """
     Each <li> in #histogramTable contains:
-      - <a aria-label="14 percent of reviews have 4 stars">  → star number
-      - <div class="a-meter" aria-valuenow="14">             → percentage
-
-    We read the star number from the aria-label and the
-    percentage directly from aria-valuenow to avoid any
-    sentence-parsing ambiguity.
+      <a aria-label="14 percent of reviews have 4 stars">  → star number
+      <div class="a-meter" aria-valuenow="14">             → percentage
     """
     result = {}
     for li in soup.select("#histogramTable li"):
@@ -79,12 +82,10 @@ def _parse_star_percentages(soup: BeautifulSoup) -> dict:
         if not (a and meter):
             continue
         label = a.get("aria-label", "")
-        # "14 percent of reviews have 4 stars"
         star_match = re.search(r"(\d+)\s+star", label, re.IGNORECASE)
         pct_val    = meter.get("aria-valuenow")
         if star_match and pct_val is not None:
-            star = int(star_match.group(1))
-            result[f"{star}_star_percentage"] = int(pct_val)
+            result[f"{int(star_match.group(1))}_star_percentage"] = int(pct_val)
     return result
 
 
@@ -93,7 +94,6 @@ def _parse_star_percentages(soup: BeautifulSoup) -> dict:
 # ─────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def fetch_amazon_data(url: str) -> dict:
-    """Fetch and parse an Amazon product page using curl_cffi (Chrome TLS impersonation)."""
     data: dict = {}
     try:
         r = cf_requests.get(
@@ -104,33 +104,24 @@ def fetch_amazon_data(url: str) -> dict:
         )
         soup = BeautifulSoup(r.text, "html.parser")
 
-        # ── Title ──────────────────────────────────────────
         title = soup.select_one("#productTitle")
         data["name"] = title.get_text(strip=True) if title else "N/A"
 
-        # ── Price ──────────────────────────────────────────
         price = soup.select_one(".a-price .a-offscreen")
         data["pricing"] = price.get_text(strip=True) if price else "N/A"
 
-        # ── Rating ─────────────────────────────────────────
         rating = soup.select_one("#acrPopover")
         data["average_rating"] = (
-            rating["title"].split()[0]
-            if rating and rating.get("title")
-            else "N/A"
+            rating["title"].split()[0] if rating and rating.get("title") else "N/A"
         )
 
-        # ── Total Reviews ──────────────────────────────────
         reviews = soup.select_one("#acrCustomerReviewText")
-        if reviews:
-            data["total_reviews"] = int(re.sub(r"[^\d]", "", reviews.get_text()))
-        else:
-            data["total_reviews"] = None
+        data["total_reviews"] = (
+            int(re.sub(r"[^\d]", "", reviews.get_text())) if reviews else None
+        )
 
-        # ── Star Percentages ───────────────────────────────
         data.update(_parse_star_percentages(soup))
 
-        # ── Images ─────────────────────────────────────────
         matches = re.findall(r'"hiRes":"(https://[^"]+)"', r.text)
         if matches:
             data["images"] = list(dict.fromkeys(matches))
@@ -147,7 +138,6 @@ def fetch_amazon_data(url: str) -> dict:
                     imgs = [main["src"]]
             data["images"] = imgs
 
-        # ── Customers Say (AI summary) ─────────────────────
         customers_say = "N/A"
         for sel in (
             "[data-hook='cr-insights-widget-summary']",
@@ -160,26 +150,21 @@ def fetch_amazon_data(url: str) -> dict:
                 break
         data["customers_say"] = {"summary": customers_say}
 
-        # ── Brand ──────────────────────────────────────────
         brand = soup.select_one("#bylineInfo")
         data["brand"] = brand.get_text(strip=True) if brand else "N/A"
 
-        # ── Availability ───────────────────────────────────
         avail = soup.select_one("#availability span")
         data["availability"] = avail.get_text(strip=True) if avail else "N/A"
 
-        # ── Features ───────────────────────────────────────
         data["features"] = [
             li.get_text(strip=True)
             for li in soup.select("#feature-bullets li span.a-list-item")
             if li.get_text(strip=True)
         ]
 
-        # ── Description ────────────────────────────────────
         desc = soup.select_one("#productDescription")
         data["description"] = desc.get_text(strip=True) if desc else "N/A"
 
-        # ── Categories ─────────────────────────────────────
         crumbs = [
             c.get_text(strip=True)
             for c in soup.select("#wayfinding-breadcrumbs_container li span")
@@ -187,12 +172,10 @@ def fetch_amazon_data(url: str) -> dict:
         ]
         data["categories"] = " > ".join(crumbs) if crumbs else "N/A"
 
-        # ── Raw histogram HTML for debugging ───────────────
         histogram_el = soup.select_one("#histogramTable")
         data["_debug_histogram_html"] = (
-            str(histogram_el)[:2000]
-            if histogram_el
-            else "⚠️ #histogramTable not found in page"
+            str(histogram_el)[:3000] if histogram_el
+            else "⚠️ #histogramTable not found"
         )
 
     except Exception as exc:
@@ -202,40 +185,58 @@ def fetch_amazon_data(url: str) -> dict:
 
 
 # ─────────────────────────────────────────────────────────────
-# Price diff helper
+# Diff helpers
 # ─────────────────────────────────────────────────────────────
-def update_all_pricing_diffs():
+def update_all_diffs():
     products = st.session_state.product_data
 
-    for product in products:
-        price_str = product.get("json", {}).get("pricing", "N/A")
+    # ── Price ──────────────────────────────────────────────
+    for p in products:
         try:
-            product["pricing_float"] = float(
-                str(price_str).replace("$", "").replace(",", "")
+            p["pricing_float"] = float(
+                str(p.get("json", {}).get("pricing", "")).replace("$", "").replace(",", "")
             )
         except Exception:
-            product["pricing_float"] = None
+            p["pricing_float"] = None
 
     for idx, cur in enumerate(products):
         cur_price = cur.get("pricing_float")
-        if cur_price is None:
-            cur["price_diff_html"] = ""
-            continue
+        html = ""
+        if cur_price is not None:
+            for j, other in enumerate(products):
+                if j == idx:
+                    continue
+                op = other.get("pricing_float")
+                if op is None:
+                    continue
+                diff = cur_price - op
+                color = "green" if diff < 0 else "red" if diff > 0 else "gray"
+                sign  = "+" if diff > 0 else "-" if diff < 0 else "±"
+                html += f"<br>[{j+1}]<span style='color:{color}'> {sign}${abs(diff):.2f}</span>"
+        cur["price_diff_html"] = html
 
-        diffs_html = ""
-        for j, other in enumerate(products):
-            if j == idx:
-                continue
-            other_price = other.get("pricing_float")
-            if other_price is None:
-                continue
-            diff = cur_price - other_price
-            color = "green" if diff < 0 else "red" if diff > 0 else "gray"
-            sign = "+" if diff > 0 else "-" if diff < 0 else "±"
-            diffs_html += (
-                f"<br>[{j+1}]<span style='color:{color};'> {sign}${abs(diff):.2f}</span>"
-            )
-        cur["price_diff_html"] = diffs_html
+    # ── Rating ─────────────────────────────────────────────
+    for p in products:
+        try:
+            p["rating_float"] = float(p.get("json", {}).get("average_rating", ""))
+        except Exception:
+            p["rating_float"] = None
+
+    for idx, cur in enumerate(products):
+        cur_rating = cur.get("rating_float")
+        html = ""
+        if cur_rating is not None:
+            for j, other in enumerate(products):
+                if j == idx:
+                    continue
+                or_ = other.get("rating_float")
+                if or_ is None:
+                    continue
+                diff = cur_rating - or_
+                color = "green" if diff > 0 else "red" if diff < 0 else "gray"
+                sign  = "+" if diff > 0 else ""
+                html += f"<br>[{j+1}]<span style='color:{color}'> {sign}{diff:+.1f}</span>"
+        cur["rating_diff_html"] = html
 
 
 # ─────────────────────────────────────────────────────────────
@@ -255,7 +256,6 @@ def render_product_column(idx, product, visible_fields):
                     st.session_state.product_data[idx - 1],
                 )
                 st.rerun()
-
             if idx < st.session_state.num_columns - 1 and st.button(
                 "➡️ Move Right", key=f"move_right_{idx}"
             ):
@@ -267,7 +267,6 @@ def render_product_column(idx, product, visible_fields):
                     st.session_state.product_data[idx + 1],
                 )
                 st.rerun()
-
             if st.button("🗑️ Remove Product", key=f"remove_product_{idx}"):
                 st.session_state.product_data.pop(idx)
                 st.session_state.num_columns -= 1
@@ -283,137 +282,98 @@ def render_product_column(idx, product, visible_fields):
         )
         if url != product.get("url"):
             st.session_state.product_data[idx]["url"] = url
-            st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
+            # Clear stale json so loader shows
+            st.session_state.product_data[idx].pop("json", None)
             st.rerun()
         st.session_state.product_data[idx]["url"] = url
 
     with col[2]:
         if st.button("🛒", key=f"amazon_{idx}", help="Open in Amazon"):
             if url:
-                st.markdown(
-                    f'<script>window.open("{url}");</script>',
-                    unsafe_allow_html=True,
-                )
+                st.markdown(f'<script>window.open("{url}");</script>', unsafe_allow_html=True)
 
     with col[3]:
         if st.button("🔄", key=f"refresh_{idx}", help="Refresh product"):
             st.cache_data.clear()
-            st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
+            st.session_state.product_data[idx].pop("json", None)
             st.rerun()
 
-    if url:
-        if "json" not in product:
-            with st.spinner("🔄 Loading product data..."):
-                st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
+    # ── Gate: show nothing below until data is fully loaded ──
+    if not url:
+        return
 
-        product_data = st.session_state.product_data[idx].get("json", {})
+    if "json" not in product:
+        with st.spinner("🔄 Loading…"):
+            st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
+            st.rerun()
+        return  # spinner shown; next rerun will have json ready
 
-        if "_error" in product_data:
-            st.warning(f"⚠️ Scrape error: {product_data['_error']}")
+    product_data = product["json"]
 
-        # ── Debug expander ─────────────────────────────────
-        with st.expander("🔍 Debug", expanded=False):
-            debug_keys = [
-                "name", "pricing", "average_rating", "total_reviews",
-                "5_star_percentage", "4_star_percentage",
-                "3_star_percentage", "2_star_percentage", "1_star_percentage",
-            ]
-            for k in debug_keys:
-                st.write(f"**{k}:** `{product_data.get(k, 'not found')}`")
-            st.write("**histogram HTML (first 2000 chars):**")
-            st.code(
-                product_data.get("_debug_histogram_html", "not captured"),
-                language="html",
+    if "_error" in product_data:
+        st.warning(f"⚠️ Scrape error: {product_data['_error']}")
+        return
+
+    # ── Render fields in stable ALL_FIELDS order ────────────
+    # (iterating ALL_FIELDS, not visible_fields, prevents reordering)
+    for field in ALL_FIELDS:
+        if field not in visible_fields:
+            continue
+
+        if field == "Title":
+            value_str = str(product_data.get("name") or "N/A")
+            st.markdown(
+                f"<div style='font-size:14pt;font-weight:bold'>"
+                f"{value_str[:150]}{'...' if len(value_str) > 150 else ''}</div>",
+                unsafe_allow_html=True,
             )
 
-        st.session_state.product_data[idx]["pricing"] = product_data.get("pricing", "N/A")
-        st.session_state.product_data[idx]["average_rating"] = product_data.get(
-            "average_rating", "N/A"
-        )
+        elif field == "Price":
+            price = product_data.get("pricing", "N/A")
+            st.markdown(
+                f"<div>💰<strong>{price}</strong>{product.get('price_diff_html','')}</div>",
+                unsafe_allow_html=True,
+            )
 
-        for field in visible_fields:
-            if field == "Title":
-                value = product_data.get("name", "")
-            elif field == "Price":
-                value = product_data.get("pricing", "")
-            elif field == "Rating":
-                value = product_data.get("average_rating", "N/A")
-            elif field == "Customers Say":
-                value = product_data.get("customers_say", {})
-            elif field == "ImageGallery":
-                value = product_data.get("images", [])
-            else:
-                value = product_data.get(field.lower(), "N/A")
+        elif field == "Rating":
+            rating     = product_data.get("average_rating", "N/A")
+            raw_count  = product_data.get("total_reviews")
+            count_display = (
+                f"{(raw_count // 100) * 100}+" if isinstance(raw_count, int) and raw_count >= 100
+                else str(raw_count) if isinstance(raw_count, int)
+                else "N/A"
+            )
+            pct_4 = int(product_data.get("4_star_percentage", 0))
+            pct_5 = int(product_data.get("5_star_percentage", 0))
+            rating_str = f"⭐ {rating}{product.get('rating_diff_html','')} [👤 {count_display}]"
+            if pct_4 or pct_5:
+                rating_str += f"<br>5⭐ {pct_5}%  4⭐ {pct_4}%  ({pct_4 + pct_5}% positive)"
+            st.markdown(rating_str, unsafe_allow_html=True)
 
-            # ── Render each field ──────────────────────────
-            if field == "Title":
-                value_str = str(value or "N/A")
+        elif field == "Customers Say":
+            summary = (product_data.get("customers_say") or {}).get("summary", "N/A")
+            st.markdown(summary)
+
+        elif field == "ImageGallery":
+            imgs = product_data.get("images", [])
+            if imgs:
                 st.markdown(
-                    f"<div style='font-size:14pt;font-weight:bold'>"
-                    f"{value_str[:150]}{'...' if len(value_str) > 150 else ''}"
-                    f"</div>",
+                    "<style>"
+                    ".scrolling-wrapper{display:flex;overflow-x:auto;padding-bottom:10px}"
+                    ".scrolling-wrapper img{height:150px;margin-right:10px;border-radius:8px}"
+                    "</style>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    '<div class="scrolling-wrapper">'
+                    + "".join(f'<img src="{img}" alt="product image">' for img in imgs)
+                    + "</div>",
                     unsafe_allow_html=True,
                 )
 
-            elif field == "Price":
-                price = product_data.get("pricing", "N/A")
-                price_md = (
-                    f"<div>💰<strong>{price}</strong>"
-                    f"{product.get('price_diff_html', '')}</div>"
-                )
-                st.markdown(price_md, unsafe_allow_html=True)
-
-            elif field == "Rating":
-                rating = product_data.get("average_rating", "N/A")
-                raw_count = product_data.get("total_reviews")
-                if isinstance(raw_count, int):
-                    count_display = (
-                        f"{(raw_count // 100) * 100}+"
-                        if raw_count >= 100
-                        else str(raw_count)
-                    )
-                else:
-                    count_display = "N/A"
-
-                rating_str = f"⭐ {rating} [👤 {count_display}]"
-                pct_4 = int(product_data.get("4_star_percentage", 0))
-                pct_5 = int(product_data.get("5_star_percentage", 0))
-                if pct_4 or pct_5:
-                    rating_str += f" {pct_4 + pct_5}%<br>5⭐ {pct_5}%     4⭐ {pct_4}%"
-                st.markdown(rating_str, unsafe_allow_html=True)
-
-            elif field == "Customers Say":
-                summary = (value or {}).get("summary", "N/A")
-                st.markdown(summary)
-
-            elif field == "ImageGallery":
-                imgs = product_data.get("images", [])
-                if imgs:
-                    st.markdown(
-                        """
-                        <style>
-                        .scrolling-wrapper {
-                            display: flex;
-                            overflow-x: auto;
-                            padding-bottom: 10px;
-                        }
-                        .scrolling-wrapper img {
-                            height: 150px;
-                            margin-right: 10px;
-                            border-radius: 8px;
-                        }
-                        </style>
-                        """,
-                        unsafe_allow_html=True,
-                    )
-                    image_html = '<div class="scrolling-wrapper">'
-                    for img in imgs:
-                        image_html += f'<img src="{img}" alt="product image">'
-                    image_html += "</div>"
-                    st.markdown(image_html, unsafe_allow_html=True)
-
-            else:
-                st.write(f"**{field.capitalize()}**: {value or 'N/A'}")
+        else:
+            value = product_data.get(field.lower(), "N/A")
+            st.write(f"**{field.capitalize()}**: {value or 'N/A'}")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -425,7 +385,7 @@ if st.button("➕ Add Product Column", help="Add a new Amazon product for compar
     st.session_state.num_columns += 1
     st.rerun()
 
-update_all_pricing_diffs()
+update_all_diffs()
 
 cols = st.columns(st.session_state.num_columns)
 for i in range(st.session_state.num_columns):
@@ -435,3 +395,28 @@ for i in range(st.session_state.num_columns):
         render_product_column(
             i, st.session_state.product_data[i], st.session_state.visible_fields
         )
+
+# ─────────────────────────────────────────────────────────────
+# Debug panel — always at bottom, opt-in via sidebar
+# ─────────────────────────────────────────────────────────────
+if st.session_state.show_debug:
+    st.divider()
+    st.subheader("🔍 Debug")
+    debug_cols = st.columns(st.session_state.num_columns)
+    for i, product in enumerate(st.session_state.product_data):
+        if i >= st.session_state.num_columns:
+            break
+        with debug_cols[i]:
+            product_data = product.get("json", {})
+            st.markdown(f"**Column {i + 1}**")
+            if not product_data:
+                st.write("No data yet.")
+                continue
+            for k in [
+                "name", "pricing", "average_rating", "total_reviews",
+                "5_star_percentage", "4_star_percentage",
+                "3_star_percentage", "2_star_percentage", "1_star_percentage",
+            ]:
+                st.write(f"**{k}:** `{product_data.get(k, 'not found')}`")
+            st.write("**histogram HTML:**")
+            st.code(product_data.get("_debug_histogram_html", "not captured"), language="html")

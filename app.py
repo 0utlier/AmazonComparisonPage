@@ -1,4 +1,4 @@
-# v0.60 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
+# v0.61 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
 #
 # requirements.txt:
 #   streamlit
@@ -64,20 +64,27 @@ def display_field_selector():
 # ─────────────────────────────────────────────────────────────
 def _parse_star_percentages(soup: BeautifulSoup) -> dict:
     """
-    Amazon now renders the histogram as a <ul id="histogramTable"> where
-    each <li> contains an <a> whose aria-label reads:
-      "62 percent of reviews have 5 stars"
-    We parse both the percentage and the star number directly from that string.
+    Each <li> in #histogramTable contains:
+      - <a aria-label="14 percent of reviews have 4 stars">  → star number
+      - <div class="a-meter" aria-valuenow="14">             → percentage
+
+    We read the star number from the aria-label and the
+    percentage directly from aria-valuenow to avoid any
+    sentence-parsing ambiguity.
     """
     result = {}
-    for a in soup.select("#histogramTable li a[aria-label]"):
+    for li in soup.select("#histogramTable li"):
+        a     = li.select_one("a[aria-label]")
+        meter = li.select_one(".a-meter[aria-valuenow]")
+        if not (a and meter):
+            continue
         label = a.get("aria-label", "")
-        # e.g. "62 percent of reviews have 5 stars"
-        match = re.search(r"(\d+)\s+percent.*?(\d+)\s+star", label, re.IGNORECASE)
-        if match:
-            pct = int(match.group(1))
-            star = int(match.group(2))
-            result[f"{star}_star_percentage"] = pct
+        # "14 percent of reviews have 4 stars"
+        star_match = re.search(r"(\d+)\s+star", label, re.IGNORECASE)
+        pct_val    = meter.get("aria-valuenow")
+        if star_match and pct_val is not None:
+            star = int(star_match.group(1))
+            result[f"{star}_star_percentage"] = int(pct_val)
     return result
 
 

@@ -1,4 +1,4 @@
-# v0.62 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
+# v0.63 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
 #
 # requirements.txt:
 #   streamlit
@@ -44,19 +44,14 @@ def display_field_selector():
     with st.sidebar.expander("DISPLAY OPTIONS", expanded=True):
         if st.button("✅ Default Options"):
             st.session_state.visible_fields = DEFAULT_FIELDS.copy()
-
         if st.button("🔁 ALL / NONE"):
-            if len(st.session_state.visible_fields) == len(ALL_FIELDS):
-                st.session_state.visible_fields = []
-            else:
-                st.session_state.visible_fields = ALL_FIELDS.copy()
-
-        # Render checkboxes in fixed ALL_FIELDS order and update a set —
-        # never append/remove, so the order never drifts.
+            st.session_state.visible_fields = (
+                [] if len(st.session_state.visible_fields) == len(ALL_FIELDS)
+                else ALL_FIELDS.copy()
+            )
         new_visible = []
         for field in ALL_FIELDS:
-            checked = field in st.session_state.visible_fields
-            if st.checkbox(field, value=checked, key=f"chk_{field}"):
+            if st.checkbox(field, value=field in st.session_state.visible_fields, key=f"chk_{field}"):
                 new_visible.append(field)
         st.session_state.visible_fields = new_visible
 
@@ -70,11 +65,6 @@ def display_field_selector():
 # Star percentage parser
 # ─────────────────────────────────────────────────────────────
 def _parse_star_percentages(soup: BeautifulSoup) -> dict:
-    """
-    Each <li> in #histogramTable contains:
-      <a aria-label="14 percent of reviews have 4 stars">  → star number
-      <div class="a-meter" aria-valuenow="14">             → percentage
-    """
     result = {}
     for li in soup.select("#histogramTable li"):
         a     = li.select_one("a[aria-label]")
@@ -97,9 +87,7 @@ def fetch_amazon_data(url: str) -> dict:
     data: dict = {}
     try:
         r = cf_requests.get(
-            url,
-            impersonate="chrome120",
-            timeout=20,
+            url, impersonate="chrome120", timeout=20,
             headers={"Accept-Language": "en-US,en;q=0.9"},
         )
         soup = BeautifulSoup(r.text, "html.parser")
@@ -128,7 +116,7 @@ def fetch_amazon_data(url: str) -> dict:
         else:
             imgs = []
             for el in soup.select("#altImages img"):
-                src = el.get("src", "")
+                src   = el.get("src", "")
                 large = re.sub(r"\._[A-Z0-9_,]+_\.", "._AC_SL1500_.", src)
                 if large.startswith("https"):
                     imgs.append(large)
@@ -174,8 +162,7 @@ def fetch_amazon_data(url: str) -> dict:
 
         histogram_el = soup.select_one("#histogramTable")
         data["_debug_histogram_html"] = (
-            str(histogram_el)[:3000] if histogram_el
-            else "⚠️ #histogramTable not found"
+            str(histogram_el)[:3000] if histogram_el else "⚠️ #histogramTable not found"
         )
 
     except Exception as exc:
@@ -187,6 +174,28 @@ def fetch_amazon_data(url: str) -> dict:
 # ─────────────────────────────────────────────────────────────
 # Diff helpers
 # ─────────────────────────────────────────────────────────────
+def _diff_html(idx, products, get_val, fmt, higher_is_better=True):
+    """Build comparison HTML for one product against all others."""
+    cur_val = get_val(products[idx])
+    if cur_val is None:
+        return ""
+    html = ""
+    for j, other in enumerate(products):
+        if j == idx:
+            continue
+        other_val = get_val(other)
+        if other_val is None:
+            continue
+        diff = cur_val - other_val
+        if higher_is_better:
+            color = "green" if diff > 0 else "red" if diff < 0 else "gray"
+        else:
+            color = "green" if diff < 0 else "red" if diff > 0 else "gray"
+        sign = "+" if diff > 0 else "-" if diff < 0 else "±"
+        html += f" &nbsp;<span style='color:{color};font-size:0.85em'>[{j+1}]{sign}{fmt(abs(diff))}</span>"
+    return html
+
+
 def update_all_diffs():
     products = st.session_state.product_data
 
@@ -199,21 +208,13 @@ def update_all_diffs():
         except Exception:
             p["pricing_float"] = None
 
-    for idx, cur in enumerate(products):
-        cur_price = cur.get("pricing_float")
-        html = ""
-        if cur_price is not None:
-            for j, other in enumerate(products):
-                if j == idx:
-                    continue
-                op = other.get("pricing_float")
-                if op is None:
-                    continue
-                diff = cur_price - op
-                color = "green" if diff < 0 else "red" if diff > 0 else "gray"
-                sign  = "+" if diff > 0 else "-" if diff < 0 else "±"
-                html += f"<br>[{j+1}]<span style='color:{color}'> {sign}${abs(diff):.2f}</span>"
-        cur["price_diff_html"] = html
+    for idx in range(len(products)):
+        products[idx]["price_diff_html"] = _diff_html(
+            idx, products,
+            get_val=lambda p: p.get("pricing_float"),
+            fmt=lambda v: f"${v:.2f}",
+            higher_is_better=False,
+        )
 
     # ── Rating ─────────────────────────────────────────────
     for p in products:
@@ -222,36 +223,42 @@ def update_all_diffs():
         except Exception:
             p["rating_float"] = None
 
-    for idx, cur in enumerate(products):
-        cur_rating = cur.get("rating_float")
-        html = ""
-        if cur_rating is not None:
-            for j, other in enumerate(products):
-                if j == idx:
-                    continue
-                or_ = other.get("rating_float")
-                if or_ is None:
-                    continue
-                diff = cur_rating - or_
-                color = "green" if diff > 0 else "red" if diff < 0 else "gray"
-                sign  = "+" if diff > 0 else ""
-                html += f"<br>[{j+1}]<span style='color:{color}'> {sign}{diff:+.1f}</span>"
-        cur["rating_diff_html"] = html
+    for idx in range(len(products)):
+        products[idx]["rating_diff_html"] = _diff_html(
+            idx, products,
+            get_val=lambda p: p.get("rating_float"),
+            fmt=lambda v: f"{v:.1f}",
+            higher_is_better=True,
+        )
+
+    # ── Positive % (4+5 star combined) ────────────────────
+    for p in products:
+        pj = p.get("json", {})
+        pct4 = pj.get("4_star_percentage") or 0
+        pct5 = pj.get("5_star_percentage") or 0
+        p["positive_pct"] = (pct4 + pct5) if (pct4 or pct5) else None
+
+    for idx in range(len(products)):
+        products[idx]["positive_pct_diff_html"] = _diff_html(
+            idx, products,
+            get_val=lambda p: p.get("positive_pct"),
+            fmt=lambda v: f"{int(v)}%",
+            higher_is_better=True,
+        )
 
 
 # ─────────────────────────────────────────────────────────────
 # Column renderer
 # ─────────────────────────────────────────────────────────────
 def render_product_column(idx, product, visible_fields):
-    col = st.columns([0.15, 0.75, 0.12, 0.1])
 
-    with col[0]:
+    # ── Row 1: popover label + URL input (full width) ──────
+    label_col, url_col = st.columns([1, 7])
+    with label_col:
         with st.popover(f"[{idx + 1}]", use_container_width=True):
             if idx > 0 and st.button("⬅️ Move Left", key=f"move_left_{idx}"):
-                (
-                    st.session_state.product_data[idx - 1],
-                    st.session_state.product_data[idx],
-                ) = (
+                (st.session_state.product_data[idx - 1],
+                 st.session_state.product_data[idx]) = (
                     st.session_state.product_data[idx],
                     st.session_state.product_data[idx - 1],
                 )
@@ -259,10 +266,8 @@ def render_product_column(idx, product, visible_fields):
             if idx < st.session_state.num_columns - 1 and st.button(
                 "➡️ Move Right", key=f"move_right_{idx}"
             ):
-                (
-                    st.session_state.product_data[idx + 1],
-                    st.session_state.product_data[idx],
-                ) = (
+                (st.session_state.product_data[idx + 1],
+                 st.session_state.product_data[idx]) = (
                     st.session_state.product_data[idx],
                     st.session_state.product_data[idx + 1],
                 )
@@ -272,33 +277,33 @@ def render_product_column(idx, product, visible_fields):
                 st.session_state.num_columns -= 1
                 st.rerun()
 
-    with col[1]:
+    with url_col:
         url = st.text_input(
-            "",
-            value=product.get("url", ""),
+            "", value=product.get("url", ""),
             placeholder="Paste Amazon product URL here",
-            key=f"url_{idx}",
-            label_visibility="collapsed",
+            key=f"url_{idx}", label_visibility="collapsed",
         )
-        if url != product.get("url"):
-            st.session_state.product_data[idx]["url"] = url
-            # Clear stale json so loader shows
-            st.session_state.product_data[idx].pop("json", None)
-            st.rerun()
-        st.session_state.product_data[idx]["url"] = url
 
-    with col[2]:
-        if st.button("🛒", key=f"amazon_{idx}", help="Open in Amazon"):
+    # ── Row 2: action buttons ──────────────────────────────
+    _, btn1_col, btn2_col = st.columns([1, 1, 1])
+    with btn1_col:
+        if st.button("🛒", key=f"amazon_{idx}", help="Open in Amazon", use_container_width=True):
             if url:
                 st.markdown(f'<script>window.open("{url}");</script>', unsafe_allow_html=True)
-
-    with col[3]:
-        if st.button("🔄", key=f"refresh_{idx}", help="Refresh product"):
+    with btn2_col:
+        if st.button("🔄", key=f"refresh_{idx}", help="Refresh", use_container_width=True):
             st.cache_data.clear()
             st.session_state.product_data[idx].pop("json", None)
             st.rerun()
 
-    # ── Gate: show nothing below until data is fully loaded ──
+    # Detect URL change
+    if url != product.get("url"):
+        st.session_state.product_data[idx]["url"] = url
+        st.session_state.product_data[idx].pop("json", None)
+        st.rerun()
+    st.session_state.product_data[idx]["url"] = url
+
+    # ── Gate: nothing renders until data is fully loaded ───
     if not url:
         return
 
@@ -306,16 +311,15 @@ def render_product_column(idx, product, visible_fields):
         with st.spinner("🔄 Loading…"):
             st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
             st.rerun()
-        return  # spinner shown; next rerun will have json ready
+        return
 
     product_data = product["json"]
 
     if "_error" in product_data:
-        st.warning(f"⚠️ Scrape error: {product_data['_error']}")
+        st.warning(f"⚠️ {product_data['_error']}")
         return
 
-    # ── Render fields in stable ALL_FIELDS order ────────────
-    # (iterating ALL_FIELDS, not visible_fields, prevents reordering)
+    # ── Render fields in stable ALL_FIELDS order ───────────
     for field in ALL_FIELDS:
         if field not in visible_fields:
             continue
@@ -330,25 +334,44 @@ def render_product_column(idx, product, visible_fields):
 
         elif field == "Price":
             price = product_data.get("pricing", "N/A")
+            diff_html = product.get("price_diff_html", "")
             st.markdown(
-                f"<div>💰<strong>{price}</strong>{product.get('price_diff_html','')}</div>",
+                f"<div>💰 <strong>{price}</strong>{diff_html}</div>",
                 unsafe_allow_html=True,
             )
 
         elif field == "Rating":
-            rating     = product_data.get("average_rating", "N/A")
-            raw_count  = product_data.get("total_reviews")
+            rating = product_data.get("average_rating", "N/A")
+            raw_count = product_data.get("total_reviews")
             count_display = (
-                f"{(raw_count // 100) * 100}+" if isinstance(raw_count, int) and raw_count >= 100
+                f"{(raw_count // 100) * 100}+"
+                if isinstance(raw_count, int) and raw_count >= 100
                 else str(raw_count) if isinstance(raw_count, int)
                 else "N/A"
             )
-            pct_4 = int(product_data.get("4_star_percentage", 0))
-            pct_5 = int(product_data.get("5_star_percentage", 0))
-            rating_str = f"⭐ {rating}{product.get('rating_diff_html','')} [👤 {count_display}]"
+            pct_4 = int(product_data.get("4_star_percentage") or 0)
+            pct_5 = int(product_data.get("5_star_percentage") or 0)
+            combined = pct_4 + pct_5
+
+            rating_diff = product.get("rating_diff_html", "")
+            pos_diff    = product.get("positive_pct_diff_html", "")
+
+            # Line 1: ⭐ rating  [👤 count]
+            # Line 2: rating comparison
+            # Line 3: [5⭐ x%] + [4⭐ y%]  (combined%)
+            # Line 4: combined comparison
+            lines = f"⭐ <strong>{rating}</strong> &nbsp; [👤 {count_display}]"
+            if rating_diff:
+                lines += f"<br><span style='font-size:0.85em'>{rating_diff.strip()}</span>"
             if pct_4 or pct_5:
-                rating_str += f"<br>5⭐ {pct_5}%  4⭐ {pct_4}%  ({pct_4 + pct_5}% positive)"
-            st.markdown(rating_str, unsafe_allow_html=True)
+                lines += (
+                    f"<br><br>[5⭐ &nbsp;{pct_5}%] &nbsp;+&nbsp; [4⭐ &nbsp;{pct_4}%]"
+                    f" &nbsp;—&nbsp; <em>({combined}% positive)</em>"
+                )
+                if pos_diff:
+                    lines += f"<br><span style='font-size:0.85em'>{pos_diff.strip()}</span>"
+
+            st.markdown(f"<div style='line-height:1.8'>{lines}</div>", unsafe_allow_html=True)
 
         elif field == "Customers Say":
             summary = (product_data.get("customers_say") or {}).get("summary", "N/A")
@@ -366,7 +389,7 @@ def render_product_column(idx, product, visible_fields):
                 )
                 st.markdown(
                     '<div class="scrolling-wrapper">'
-                    + "".join(f'<img src="{img}" alt="product image">' for img in imgs)
+                    + "".join(f'<img src="{img}" alt="product">' for img in imgs)
                     + "</div>",
                     unsafe_allow_html=True,
                 )
@@ -381,7 +404,7 @@ def render_product_column(idx, product, visible_fields):
 # ─────────────────────────────────────────────────────────────
 display_field_selector()
 
-if st.button("➕ Add Product Column", help="Add a new Amazon product for comparison"):
+if st.button("➕ Add Product Column"):
     st.session_state.num_columns += 1
     st.rerun()
 

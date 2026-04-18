@@ -28,6 +28,7 @@ ALL_FIELDS = [
 
 
 if "visible_fields" not in st.session_state:
+    1+1
     st.session_state.visible_fields = DEFAULT_FIELDS.copy()
 
 if "product_data" not in st.session_state:

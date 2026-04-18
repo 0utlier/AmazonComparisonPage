@@ -1,10 +1,12 @@
-# v0.65 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
+# v0.66 — curl_cffi + BeautifulSoup (no Playwright, no ScraperAPI)
+# Adds: variant selector (color / size / style) per product column
 #
 # requirements.txt:
 #   streamlit
 #   curl_cffi
 #   beautifulsoup4
 
+import json
 import re
 import streamlit as st
 from curl_cffi import requests as cf_requests
@@ -43,7 +45,10 @@ if "product_data"    not in st.session_state: st.session_state.product_data    =
 if "num_columns"     not in st.session_state: st.session_state.num_columns     = 2
 if "show_debug"      not in st.session_state: st.session_state.show_debug      = False
 
-# Initialise checkbox keys so buttons can override them before widgets render
+
+# ─────────────────────────────────────────────────────────────
+# Checkbox sync helper
+# ─────────────────────────────────────────────────────────────
 def _sync_checkboxes_to_visible():
     """Push visible_fields into the individual chk_ keys so widgets reflect state."""
     for field in ALL_FIELDS:
@@ -67,20 +72,128 @@ def display_field_selector():
 
         new_visible = []
         for field in ALL_FIELDS:
-            # Initialise key on first render so it exists before the widget
             if f"chk_{field}" not in st.session_state:
                 st.session_state[f"chk_{field}"] = field in st.session_state.visible_fields
-
             if st.checkbox(field, key=f"chk_{field}"):
                 new_visible.append(field)
-
-        # Keep visible_fields in sync with manual checkbox clicks
         st.session_state.visible_fields = new_visible
 
     with st.sidebar.expander("DEBUG", expanded=False):
         st.session_state.show_debug = st.checkbox(
             "Show debug panel", value=st.session_state.show_debug, key="chk_debug"
         )
+
+
+# ─────────────────────────────────────────────────────────────
+# Variant parser helpers
+# ─────────────────────────────────────────────────────────────
+def _extract_balanced_braces(text: str, marker: str) -> str | None:
+    """Locate marker in text, then return the balanced {...} object that follows it."""
+    idx = text.find(marker)
+    if idx == -1:
+        return None
+    brace_start = text.find("{", idx + len(marker))
+    if brace_start == -1:
+        return None
+    depth = 0
+    for i, ch in enumerate(text[brace_start:], brace_start):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[brace_start : i + 1]
+    return None
+
+
+def _parse_variants(raw_html: str) -> list[dict]:
+    """
+    Extract variant options from Amazon's embedded JSON blobs.
+
+    Strategy 1 — dimensionValuesDisplayData
+        Maps ASIN → [dimension values], e.g. {"B001": ["Black", "128 GB"], ...}
+        This is the most reliable source; present on the majority of multi-variant listings.
+
+    Strategy 2 — twister-js-init-dpx-data P.register block
+        Falls back to a different schema used by some listings where
+        dimensionValuesDisplayData is absent.
+
+    Returns a list of {"asin": str, "label": str} dicts, or [] if none found.
+    """
+    variants = []
+
+    # ── Strategy 1 ────────────────────────────────────────────
+    raw_obj = _extract_balanced_braces(raw_html, '"dimensionValuesDisplayData"')
+    if raw_obj:
+        try:
+            dd = json.loads(raw_obj)
+            for asin, values in dd.items():
+                # ASINs are always 10 alphanumeric chars; skip malformed keys
+                if not isinstance(values, list) or len(asin) != 10:
+                    continue
+                label = " / ".join(str(v) for v in values if v)
+                if label:
+                    variants.append({"asin": asin, "label": label})
+        except Exception:
+            pass
+
+    # ── Strategy 2: scan P.register('twister-js-init-dpx-data', ...) ────────
+    if not variants:
+        register_match = re.search(
+            r"P\.register\(['\"]twister-js-init-dpx-data['\"],\s*(\{)",
+            raw_html,
+        )
+        if register_match:
+            # Extract the full JSON object starting at the matched brace
+            brace_start = register_match.start(1)
+            depth = 0
+            end = brace_start
+            for i, ch in enumerate(raw_html[brace_start:], brace_start):
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i
+                        break
+            try:
+                obj = json.loads(raw_html[brace_start : end + 1])
+                # Look for a "variants" or "dimensionToAsinMap" sub-key
+                for key in ("variants", "dimensionToAsinMap"):
+                    sub = obj.get(key)
+                    if isinstance(sub, dict):
+                        for asin, meta in sub.items():
+                            if len(asin) != 10:
+                                continue
+                            if isinstance(meta, dict):
+                                label_parts = [
+                                    str(meta.get(k, ""))
+                                    for k in ("color", "size", "style", "edition")
+                                    if meta.get(k)
+                                ]
+                                label = " / ".join(label_parts) or asin
+                            else:
+                                label = str(meta)
+                            variants.append({"asin": asin, "label": label})
+                        break
+            except Exception:
+                pass
+
+    # De-duplicate by ASIN while preserving order
+    seen = set()
+    deduped = []
+    for v in variants:
+        if v["asin"] not in seen:
+            seen.add(v["asin"])
+            deduped.append(v)
+
+    return deduped
+
+
+def _asin_from_url(url: str) -> str | None:
+    """Extract the 10-char ASIN from an Amazon product URL."""
+    m = re.search(r"/dp/([A-Z0-9]{10})", url)
+    return m.group(1) if m else None
 
 
 # ─────────────────────────────────────────────────────────────
@@ -148,10 +261,10 @@ def fetch_amazon_data(url: str) -> dict:
                     imgs = [main["src"]]
             data["images"] = imgs
 
-        # ── Customers Say — updated selectors ──────────────────
+        # ── Customers Say ──────────────────────────────────────
         customers_say = "N/A"
         for sel in (
-            "[data-testid='overall-summary']",          # primary (current Amazon layout)
+            "[data-testid='overall-summary']",
             "[data-hook='cr-insights-widget-summary']",
             ".cr-lighthouse-summary",
             "[data-hook='cr-insights-widget-aspects']",
@@ -159,7 +272,6 @@ def fetch_amazon_data(url: str) -> dict:
             el = soup.select_one(sel)
             if el:
                 text = el.get_text(strip=True)
-                # Strip the "Customers say" heading if captured alongside the summary
                 text = re.sub(r"^Customers\s+say\s*", "", text, flags=re.IGNORECASE).strip()
                 if text:
                     customers_say = text
@@ -192,6 +304,9 @@ def fetch_amazon_data(url: str) -> dict:
         data["_debug_histogram_html"] = (
             str(histogram_el)[:3000] if histogram_el else "⚠️ #histogramTable not found"
         )
+
+        # ── Variants ───────────────────────────────────────────
+        data["variants"] = _parse_variants(r.text)
 
     except Exception as exc:
         data["_error"] = str(exc)
@@ -230,7 +345,6 @@ def _diff_html(idx, products, get_val, fmt, higher_is_better=True):
 def update_all_diffs():
     products = st.session_state.product_data
 
-    # Price
     for p in products:
         try:
             p["pricing_float"] = float(
@@ -246,7 +360,6 @@ def update_all_diffs():
             higher_is_better=False,
         )
 
-    # Rating
     for p in products:
         try:
             p["rating_float"] = float(p.get("json", {}).get("average_rating", ""))
@@ -260,7 +373,6 @@ def update_all_diffs():
             higher_is_better=True,
         )
 
-    # Positive % (4+5 star)
     for p in products:
         pj   = p.get("json", {})
         pct4 = pj.get("4_star_percentage") or 0
@@ -311,8 +423,9 @@ def render_header(idx, product):
         )
 
     if url != product.get("url"):
-        st.session_state.product_data[idx]["url"] = url
-        st.session_state.product_data[idx].pop("json", None)
+        st.session_state.product_data[idx]["url"]      = url
+        st.session_state.product_data[idx].pop("json",     None)
+        st.session_state.product_data[idx].pop("variants", None)   # reset variants on new URL
         st.rerun()
     st.session_state.product_data[idx]["url"] = url
 
@@ -336,13 +449,69 @@ def render_header(idx, product):
     with btn_r:
         if st.button("🔄", key=f"refresh_{idx}", use_container_width=True, help="Refresh"):
             st.cache_data.clear()
-            st.session_state.product_data[idx].pop("json", None)
+            st.session_state.product_data[idx].pop("json",     None)
+            st.session_state.product_data[idx].pop("variants", None)
             st.rerun()
 
+    # Trigger load if URL present but data missing
     if url and "json" not in product:
         with st.spinner("Loading…"):
-            st.session_state.product_data[idx]["json"] = fetch_amazon_data(url)
+            fetched = fetch_amazon_data(url)
+            st.session_state.product_data[idx]["json"] = fetched
+            # Store variants at product level so they survive variant-URL switches.
+            # Only set on first load (or if currently empty) so the list doesn't
+            # disappear while the new variant page is being fetched.
+            if fetched.get("variants"):
+                st.session_state.product_data[idx]["variants"] = fetched["variants"]
             st.rerun()
+
+
+# ─────────────────────────────────────────────────────────────
+# Variant selector row
+# ─────────────────────────────────────────────────────────────
+def render_variant_selector(idx: int, product: dict) -> None:
+    """
+    Render a selectbox listing all variants for this product column.
+    Selecting a different variant swaps the URL to amazon.com/dp/{ASIN}
+    and clears the cached product data so it re-fetches automatically.
+    The variants list itself is preserved at the product level so it
+    doesn't vanish while the new page loads.
+    """
+    variants = product.get("variants", [])
+    if len(variants) <= 1:
+        # Nothing to show — render a subtle placeholder so column heights stay aligned
+        st.markdown(
+            "<span style='color:#555;font-size:0.8em'>no variants detected</span>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    labels = [v["label"] for v in variants]
+    asins  = [v["asin"]  for v in variants]
+
+    # Determine which variant is currently active based on the URL's ASIN
+    current_asin = _asin_from_url(product.get("url", ""))
+    try:
+        current_index = asins.index(current_asin) if current_asin in asins else 0
+    except ValueError:
+        current_index = 0
+
+    selected_index = st.selectbox(
+        "Variant",
+        options=range(len(labels)),
+        format_func=lambda i: labels[i],
+        index=current_index,
+        key=f"variant_sel_{idx}",
+        label_visibility="collapsed",
+    )
+
+    selected_asin = asins[selected_index]
+    if selected_asin != current_asin:
+        variant_url = f"https://www.amazon.com/dp/{selected_asin}"
+        st.session_state.product_data[idx]["url"]  = variant_url
+        st.session_state.product_data[idx].pop("json", None)
+        # Keep "variants" so the dropdown doesn't disappear mid-load
+        st.rerun()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -483,12 +652,24 @@ update_all_diffs()
 num_cols = st.session_state.num_columns
 products = st.session_state.product_data
 
+# ── Header row ────────────────────────────────────────────────
 st.markdown("<div class='field-divider'></div>", unsafe_allow_html=True)
 header_cols = st.columns(num_cols)
 for i in range(num_cols):
     with header_cols[i]:
         render_header(i, products[i])
 
+# ── Variant selector row ──────────────────────────────────────
+# Only render the row if at least one column has variants available
+any_variants = any(len(p.get("variants", [])) > 1 for p in products)
+if any_variants:
+    st.markdown("<div class='field-divider'></div>", unsafe_allow_html=True)
+    variant_cols = st.columns(num_cols)
+    for i in range(num_cols):
+        with variant_cols[i]:
+            render_variant_selector(i, products[i])
+
+# ── Field rows ────────────────────────────────────────────────
 for field in ALL_FIELDS:
     if field not in st.session_state.visible_fields:
         continue
@@ -518,5 +699,7 @@ if st.session_state.show_debug:
                 "3_star_percentage", "2_star_percentage", "1_star_percentage",
             ]:
                 st.write(f"**{k}:** `{product_data.get(k, 'not found')}`")
+            st.write("**Variants detected:**")
+            st.json(products[i].get("variants", []))
             st.write("**histogram HTML:**")
             st.code(product_data.get("_debug_histogram_html", "not captured"), language="html")

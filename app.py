@@ -9,6 +9,17 @@ import streamlit as st
 from playwright.sync_api import sync_playwright
 from playwright_stealth import stealth_sync
 
+import subprocess, sys
+
+@st.cache_resource(show_spinner=False)
+def _install_playwright():
+    subprocess.run(
+        [sys.executable, "-m", "playwright", "install", "chromium"],
+        check=True, capture_output=True
+    )
+
+_install_playwright()
+
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 st.title("🛍️ Amazon Product Comparison")
 

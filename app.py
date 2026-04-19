@@ -209,22 +209,52 @@ def fetch_amazon_data(url: str) -> dict:
                     imgs = [main["src"]]
             data["images"] = imgs
 
-        # ── Review images from "Reviews with images" carousel ──
+        # ── Review images — pulled from individual customer reviews ──
+        #
+        # Strategy 1: Images embedded directly inside review elements.
+        # Amazon renders review photos inside data-hook="review" blocks;
+        # each photo tile carries the real image URL (not the product images).
         review_imgs = []
+        product_img_set = set(data.get("images", []))  # exclude stock photos
+
         for img in soup.select(
-            "#cr-media-carousel img, "
-            "[data-hook='cr-media-carousel'] img, "
-            ".cr-lighthouse-media-grid img, "
-            "[data-hook='cr-media-carousel-container'] img"
+            "[data-hook='review-image-tile'] img, "
+            "[data-hook='cr-image-stripe-thumbnail'] img, "
+            ".review-image-tile img, "
+            "[data-hook='review'] img.s-image, "
+            "[data-hook='review'] .review-image-container img"
         ):
             src = img.get("src") or img.get("data-src") or ""
-            if src.startswith("https"):
+            if src.startswith("https") and "media-amazon" in src:
                 large = re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", src)
-                review_imgs.append(large)
+                if large not in product_img_set:
+                    review_imgs.append(large)
+
+        # Strategy 2: Amazon serialises review-lightbox data in inline JSON as
+        #   {"thumb":"...","large":"..."}  pairs — distinct from the product-image
+        #   JSON which uses "hiRes" / "main" keys instead.
         if not review_imgs:
-            for thumb in re.findall(r'"thumb"\s*:\s*"(https://[^"]+)"', r.text):
-                large = re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", thumb)
-                review_imgs.append(large)
+            # Match thumb+large pairs together so we can grab the "large" URL
+            for _thumb, large in re.findall(
+                r'"thumb"\s*:\s*"(https://[^"]+)"[^}]*?"large"\s*:\s*"(https://[^"]+)"',
+                r.text,
+            ):
+                large = re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", large)
+                if large not in product_img_set:
+                    review_imgs.append(large)
+
+        # Strategy 3: Broader scan — any media-amazon URL that sits inside a
+        #   review-specific JSON key ("reviewImageList", "imageURL" etc.) and
+        #   doesn't duplicate a product image already captured.
+        if not review_imgs:
+            for url in re.findall(
+                r'"(?:imageURL|reviewImageURL|large)"\s*:\s*"(https://m\\.media-amazon\\.com/images/[^"]+)"',
+                r.text,
+            ):
+                large = re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", url)
+                if large not in product_img_set:
+                    review_imgs.append(large)
+
         data["review_images"] = list(dict.fromkeys(review_imgs))
 
         # ── Customers Say — updated selectors ──────────────────

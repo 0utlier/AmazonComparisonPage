@@ -5,6 +5,7 @@
 #   curl_cffi
 #   beautifulsoup4
 
+import json
 import re
 import streamlit as st
 import streamlit.components.v1 as components
@@ -163,25 +164,30 @@ def fetch_amazon_data(url: str) -> dict:
         asin   = asin_m.group(1) if asin_m else None
 
         def _scrape_review_imgs(html_text, soup_obj):
-            """Pull customer photo URLs from a parsed page."""
+            """Pull ONLY user-uploaded review photo URLs (not avatars/icons)."""
             found = []
-            # HTML: images inside individual review blocks
+            # Target the explicit review-photo tile containers only.
+            # Do NOT use [data-hook='review'] img — that captures profile avatars too.
             for img in soup_obj.select(
                 "[data-hook='review-image-tile'] img, "
                 "[data-hook='cr-image-stripe-thumbnail'] img, "
                 ".review-image-tile img, "
-                "[data-hook='review'] img"
+                ".cr-media-viewer-group img"
             ):
                 src = img.get("src") or img.get("data-src") or ""
-                if src.startswith("https") and "media-amazon" in src:
+                # Amazon user-uploaded photos always live under /images/I/
+                # Profile pictures and UI icons do not.
+                if "media-amazon.com/images/I/" in src:
                     found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", src))
-            # JSON fallback: {"thumb":"…","large":"…"} pairs in inline scripts
+            # JSON fallback: review lightbox data has paired thumb+large keys.
+            # We grab "large" (the display URL) only when it's a user upload path.
             if not found:
                 for _t, large in re.findall(
-                    r'"thumb"\s*:\s*"(https://[^"]+)"[^}]{0,120}?"large"\s*:\s*"(https://[^"]+)"',
+                    r'"thumb"\s*:\s*"(https://[^"]+)"[^}]{0,200}?"large"\s*:\s*"(https://[^"]+)"',
                     html_text,
                 ):
-                    found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", large))
+                    if "media-amazon.com/images/I/" in large:
+                        found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", large))
             return found
 
         # Pass 1: harvest any images already present on the product page
@@ -409,56 +415,88 @@ def render_header(idx, product):
 # Shared scrollable gallery with click-to-expand lightbox
 # ─────────────────────────────────────────────────────────────
 _LIGHTBOX_JS = """
-function lbOpen(src) {
-    var doc = window.parent.document;
+function lbOpen(src, allSrcs, startIdx) {
+    var par = window.parent;
+    var doc = par.document;
     var ov  = doc.getElementById('__lb_ov');
+
     if (!ov) {
+        /* ── Build overlay (once) ── */
         ov = doc.createElement('div');
         ov.id = '__lb_ov';
-        ov.style.cssText = [
-            'display:none','position:fixed','inset:0',
-            'background:rgba(0,0,0,0.88)','z-index:2147483647',
-            'align-items:center','justify-content:center','cursor:zoom-out'
-        ].join(';');
+        ov.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:2147483647;align-items:center;justify-content:center;';
+        ov.addEventListener('click', function(e){ if(e.target===ov) par.__lbClose(); });
 
-        var cls = doc.createElement('span');
-        cls.innerHTML = '&#x2715;';
-        cls.title = 'Close (Esc)';
-        cls.style.cssText = [
-            'position:fixed','top:18px','right:24px','color:#fff',
-            'font-size:1.6rem','font-weight:bold','cursor:pointer',
-            'background:rgba(0,0,0,0.55)','border-radius:50%',
-            'width:38px','height:38px','display:flex',
-            'align-items:center','justify-content:center',
-            'line-height:1','user-select:none','z-index:2147483647'
-        ].join(';');
-        cls.onclick = function(e){ e.stopPropagation(); lbClose(); };
+        function mkBtn(id, html, extra) {
+            var b = doc.createElement('button');
+            b.id = id; b.innerHTML = html;
+            b.style.cssText = 'position:fixed;color:#fff;background:rgba(255,255,255,0.13);border:none;border-radius:50%;width:52px;height:52px;font-size:1.5rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .18s;' + extra;
+            b.onmouseenter = function(){ this.style.background='rgba(255,255,255,0.28)'; };
+            b.onmouseleave = function(){ this.style.background='rgba(255,255,255,0.13)'; };
+            return b;
+        }
+
+        var prev = mkBtn('__lb_prev', '&#10094;', 'left:16px;top:50%;transform:translateY(-50%);');
+        var next = mkBtn('__lb_next', '&#10095;', 'right:16px;top:50%;transform:translateY(-50%);');
+        var cls  = mkBtn('__lb_cls',  '&#x2715;', 'top:14px;right:14px;width:40px;height:40px;font-size:1.1rem;');
+
+        prev.addEventListener('click', function(e){ e.stopPropagation(); par.__lbNav(-1); });
+        next.addEventListener('click', function(e){ e.stopPropagation(); par.__lbNav(1); });
+        cls.addEventListener('click',  function(e){ e.stopPropagation(); par.__lbClose(); });
 
         var img = doc.createElement('img');
         img.id = '__lb_img';
-        img.style.cssText = [
-            'max-width:92vw','max-height:90vh',
-            'border-radius:10px','object-fit:contain',
-            'box-shadow:0 8px 60px rgba(0,0,0,0.9)',
-            'cursor:default'
-        ].join(';');
-        img.onclick = function(e){ e.stopPropagation(); };
+        img.style.cssText = 'max-width:86vw;max-height:84vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 60px rgba(0,0,0,0.9);cursor:default;user-select:none;';
+        img.addEventListener('click', function(e){ e.stopPropagation(); });
 
-        ov.appendChild(cls);
+        var ctr = doc.createElement('div');
+        ctr.id = '__lb_ctr';
+        ctr.style.cssText = 'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.75);font-size:0.85rem;font-family:system-ui,sans-serif;background:rgba(0,0,0,0.55);padding:3px 14px;border-radius:20px;pointer-events:none;white-space:nowrap;';
+
+        ov.appendChild(prev);
         ov.appendChild(img);
-        ov.onclick = function(){ lbClose(); };
+        ov.appendChild(next);
+        ov.appendChild(cls);
+        ov.appendChild(ctr);
         doc.body.appendChild(ov);
 
         doc.addEventListener('keydown', function(e){
-            if (e.key === 'Escape') lbClose();
+            if (e.key==='Escape')     par.__lbClose();
+            if (e.key==='ArrowLeft')  par.__lbNav && par.__lbNav(-1);
+            if (e.key==='ArrowRight') par.__lbNav && par.__lbNav(1);
         });
     }
-    doc.getElementById('__lb_img').src = src;
+
+    /* ── Store state on parent so nav works across iframes ── */
+    par.__lbImgs = (allSrcs && allSrcs.length) ? allSrcs : [src];
+    par.__lbIdx  = (typeof startIdx === 'number') ? startIdx : 0;
+
+    par.__lbClose = function() {
+        var o = doc.getElementById('__lb_ov');
+        if (o) o.style.display = 'none';
+    };
+    par.__lbNav = function(dir) {
+        par.__lbIdx = (par.__lbIdx + dir + par.__lbImgs.length) % par.__lbImgs.length;
+        var i = doc.getElementById('__lb_img');
+        var c = doc.getElementById('__lb_ctr');
+        if (i) i.src = par.__lbImgs[par.__lbIdx];
+        if (c) c.textContent = (par.__lbIdx + 1) + ' / ' + par.__lbImgs.length;
+    };
+
+    /* ── Populate & show ── */
+    var imgEl = doc.getElementById('__lb_img');
+    var ctrEl = doc.getElementById('__lb_ctr');
+    var prvEl = doc.getElementById('__lb_prev');
+    var nxtEl = doc.getElementById('__lb_next');
+
+    if (imgEl) imgEl.src = src;
+    if (ctrEl) ctrEl.textContent = (par.__lbIdx + 1) + ' / ' + par.__lbImgs.length;
+
+    var showNav = par.__lbImgs.length > 1;
+    if (prvEl) prvEl.style.display = showNav ? 'flex' : 'none';
+    if (nxtEl) nxtEl.style.display = showNav ? 'flex' : 'none';
+
     ov.style.display = 'flex';
-}
-function lbClose() {
-    var ov = window.parent.document.getElementById('__lb_ov');
-    if (ov) ov.style.display = 'none';
 }
 """
 
@@ -488,7 +526,7 @@ body { background: transparent; overflow-x: hidden; }
 
 def _render_gallery(imgs: list, label: str = "Images") -> None:
     """Render a horizontally scrollable image row.
-    Clicking any thumbnail opens a full-page lightbox via window.parent.
+    Clicking any thumbnail opens a full-page lightbox with prev/next navigation.
     """
     if not imgs:
         st.markdown(
@@ -498,13 +536,15 @@ def _render_gallery(imgs: list, label: str = "Images") -> None:
         )
         return
 
+    imgs_json = json.dumps(imgs)   # safe JS array passed to lbOpen
     thumbs = "".join(
-        f'<img src="{u}" alt="" loading="lazy" onclick="lbOpen(this.src)">' for u in imgs
+        f'<img src="{u}" alt="" loading="lazy" onclick="lbOpen(this.src,_imgs,{i})">'
+        for i, u in enumerate(imgs)
     )
     html = (
         _GALLERY_CSS
         + f'<div class="gallery">{thumbs}</div>'
-        + f"<script>{_LIGHTBOX_JS}</script>"
+        + f"<script>var _imgs={imgs_json};\n{_LIGHTBOX_JS}</script>"
     )
     components.html(html, height=162, scrolling=False)
 

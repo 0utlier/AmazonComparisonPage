@@ -7,79 +7,21 @@
 
 import re
 import streamlit as st
+import streamlit.components.v1 as components
 from curl_cffi import requests as cf_requests
 from bs4 import BeautifulSoup
 
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 st.title("🛍️ Amazon Product Comparison")
 
-# ── Row divider style + global lightbox injected once ─────────
+# ── Row divider style ──────────────────────────────────────────
+# (Lightbox is now self-contained inside each gallery component)
 st.markdown(
     """
     <style>
     .field-divider { border-top: 1px solid #2a2a2a; margin: 4px 0 4px 0; }
     div[data-testid="column"] { padding: 4px 8px !important; }
-
-    /* ── Lightbox overlay ── */
-    #lb-overlay {
-        display: none; position: fixed;
-        top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.88);
-        z-index: 99999;
-        align-items: center; justify-content: center;
-        cursor: zoom-out;
-    }
-    #lb-overlay.lb-active { display: flex; }
-    #lb-img {
-        max-width: 92vw; max-height: 92vh;
-        border-radius: 10px;
-        box-shadow: 0 8px 60px rgba(0,0,0,0.9);
-        object-fit: contain;
-    }
-    #lb-close {
-        position: fixed; top: 18px; right: 28px;
-        color: #fff; font-size: 2rem; line-height: 1;
-        cursor: pointer; z-index: 100000;
-        background: rgba(0,0,0,0.5); border-radius: 50%;
-        width: 40px; height: 40px;
-        display: flex; align-items: center; justify-content: center;
-    }
-    #lb-close:hover { background: rgba(255,255,255,0.15); }
-
-    /* ── Scrollable gallery ── */
-    .img-gallery {
-        display: flex; overflow-x: auto; padding-bottom: 8px; gap: 8px;
-        scrollbar-width: thin;
-    }
-    .img-gallery::-webkit-scrollbar { height: 5px; }
-    .img-gallery::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
-    .img-gallery img {
-        height: 140px; border-radius: 6px; flex-shrink: 0;
-        cursor: zoom-in; transition: transform 0.15s, box-shadow 0.15s;
-    }
-    .img-gallery img:hover {
-        transform: scale(1.04);
-        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
-    }
     </style>
-
-    <!-- Global lightbox element (rendered once) -->
-    <div id="lb-overlay" onclick="lbClose()">
-        <span id="lb-close" onclick="event.stopPropagation();lbClose()">&#x2715;</span>
-        <img id="lb-img" src="" alt="">
-    </div>
-    <script>
-    function lbOpen(src) {
-        document.getElementById('lb-img').src = src;
-        document.getElementById('lb-overlay').classList.add('lb-active');
-    }
-    function lbClose() {
-        document.getElementById('lb-overlay').classList.remove('lb-active');
-    }
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') lbClose();
-    });
-    </script>
     """,
     unsafe_allow_html=True,
 )
@@ -209,53 +151,62 @@ def fetch_amazon_data(url: str) -> dict:
                     imgs = [main["src"]]
             data["images"] = imgs
 
-        # ── Review images — pulled from individual customer reviews ──
-        #
-        # Strategy 1: Images embedded directly inside review elements.
-        # Amazon renders review photos inside data-hook="review" blocks;
-        # each photo tile carries the real image URL (not the product images).
-        review_imgs = []
-        product_img_set = set(data.get("images", []))  # exclude stock photos
+        # ── Review images — fetch the media-only reviews page ──────
+        # The product page only renders a handful of review images inline.
+        # Amazon's ?mediaType=media_reviews_only filter shows every review
+        # that has photos, giving us the full set in one extra request.
+        review_imgs     = []
+        product_img_set = set(data.get("images", []))
 
-        for img in soup.select(
-            "[data-hook='review-image-tile'] img, "
-            "[data-hook='cr-image-stripe-thumbnail'] img, "
-            ".review-image-tile img, "
-            "[data-hook='review'] img.s-image, "
-            "[data-hook='review'] .review-image-container img"
-        ):
-            src = img.get("src") or img.get("data-src") or ""
-            if src.startswith("https") and "media-amazon" in src:
-                large = re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", src)
-                if large not in product_img_set:
-                    review_imgs.append(large)
+        # Extract ASIN from the URL so we can build the reviews endpoint
+        asin_m = re.search(r"/(?:dp|product|gp/product)/([A-Z0-9]{10})", url)
+        asin   = asin_m.group(1) if asin_m else None
 
-        # Strategy 2: Amazon serialises review-lightbox data in inline JSON as
-        #   {"thumb":"...","large":"..."}  pairs — distinct from the product-image
-        #   JSON which uses "hiRes" / "main" keys instead.
-        if not review_imgs:
-            # Match thumb+large pairs together so we can grab the "large" URL
-            for _thumb, large in re.findall(
-                r'"thumb"\s*:\s*"(https://[^"]+)"[^}]*?"large"\s*:\s*"(https://[^"]+)"',
-                r.text,
+        def _scrape_review_imgs(html_text, soup_obj):
+            """Pull customer photo URLs from a parsed page."""
+            found = []
+            # HTML: images inside individual review blocks
+            for img in soup_obj.select(
+                "[data-hook='review-image-tile'] img, "
+                "[data-hook='cr-image-stripe-thumbnail'] img, "
+                ".review-image-tile img, "
+                "[data-hook='review'] img"
             ):
-                large = re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", large)
-                if large not in product_img_set:
-                    review_imgs.append(large)
+                src = img.get("src") or img.get("data-src") or ""
+                if src.startswith("https") and "media-amazon" in src:
+                    found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", src))
+            # JSON fallback: {"thumb":"…","large":"…"} pairs in inline scripts
+            if not found:
+                for _t, large in re.findall(
+                    r'"thumb"\s*:\s*"(https://[^"]+)"[^}]{0,120}?"large"\s*:\s*"(https://[^"]+)"',
+                    html_text,
+                ):
+                    found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", large))
+            return found
 
-        # Strategy 3: Broader scan — any media-amazon URL that sits inside a
-        #   review-specific JSON key ("reviewImageList", "imageURL" etc.) and
-        #   doesn't duplicate a product image already captured.
-        if not review_imgs:
-            for url in re.findall(
-                r'"(?:imageURL|reviewImageURL|large)"\s*:\s*"(https://m\\.media-amazon\\.com/images/[^"]+)"',
-                r.text,
-            ):
-                large = re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", url)
-                if large not in product_img_set:
-                    review_imgs.append(large)
+        # Pass 1: harvest any images already present on the product page
+        review_imgs += _scrape_review_imgs(r.text, soup)
 
-        data["review_images"] = list(dict.fromkeys(review_imgs))
+        # Pass 2: fetch the dedicated media-reviews page (all pages = page 1 is plenty)
+        if asin:
+            try:
+                rev_url = (
+                    f"https://www.amazon.com/product-reviews/{asin}"
+                    f"?filterByStar=all_stars&mediaType=media_reviews_only&pageNumber=1"
+                )
+                rev_r    = cf_requests.get(
+                    rev_url, impersonate="chrome120", timeout=15,
+                    headers={"Accept-Language": "en-US,en;q=0.9"},
+                )
+                rev_soup = BeautifulSoup(rev_r.text, "html.parser")
+                review_imgs += _scrape_review_imgs(rev_r.text, rev_soup)
+            except Exception:
+                pass  # silently skip if the second request fails
+
+        # Deduplicate and strip any accidental product-image duplicates
+        data["review_images"] = [
+            u for u in list(dict.fromkeys(review_imgs)) if u not in product_img_set
+        ]
 
         # ── Customers Say — updated selectors ──────────────────
         customers_say = "N/A"
@@ -455,6 +406,110 @@ def render_header(idx, product):
 
 
 # ─────────────────────────────────────────────────────────────
+# Shared scrollable gallery with click-to-expand lightbox
+# ─────────────────────────────────────────────────────────────
+_LIGHTBOX_JS = """
+function lbOpen(src) {
+    var doc = window.parent.document;
+    var ov  = doc.getElementById('__lb_ov');
+    if (!ov) {
+        ov = doc.createElement('div');
+        ov.id = '__lb_ov';
+        ov.style.cssText = [
+            'display:none','position:fixed','inset:0',
+            'background:rgba(0,0,0,0.88)','z-index:2147483647',
+            'align-items:center','justify-content:center','cursor:zoom-out'
+        ].join(';');
+
+        var cls = doc.createElement('span');
+        cls.innerHTML = '&#x2715;';
+        cls.title = 'Close (Esc)';
+        cls.style.cssText = [
+            'position:fixed','top:18px','right:24px','color:#fff',
+            'font-size:1.6rem','font-weight:bold','cursor:pointer',
+            'background:rgba(0,0,0,0.55)','border-radius:50%',
+            'width:38px','height:38px','display:flex',
+            'align-items:center','justify-content:center',
+            'line-height:1','user-select:none','z-index:2147483647'
+        ].join(';');
+        cls.onclick = function(e){ e.stopPropagation(); lbClose(); };
+
+        var img = doc.createElement('img');
+        img.id = '__lb_img';
+        img.style.cssText = [
+            'max-width:92vw','max-height:90vh',
+            'border-radius:10px','object-fit:contain',
+            'box-shadow:0 8px 60px rgba(0,0,0,0.9)',
+            'cursor:default'
+        ].join(';');
+        img.onclick = function(e){ e.stopPropagation(); };
+
+        ov.appendChild(cls);
+        ov.appendChild(img);
+        ov.onclick = function(){ lbClose(); };
+        doc.body.appendChild(ov);
+
+        doc.addEventListener('keydown', function(e){
+            if (e.key === 'Escape') lbClose();
+        });
+    }
+    doc.getElementById('__lb_img').src = src;
+    ov.style.display = 'flex';
+}
+function lbClose() {
+    var ov = window.parent.document.getElementById('__lb_ov');
+    if (ov) ov.style.display = 'none';
+}
+"""
+
+_GALLERY_CSS = """
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: transparent; overflow-x: hidden; }
+.gallery {
+    display: flex; overflow-x: auto; gap: 8px;
+    padding: 4px 2px 10px 2px;
+    scrollbar-width: thin; scrollbar-color: #555 transparent;
+}
+.gallery::-webkit-scrollbar       { height: 5px; }
+.gallery::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+.gallery img {
+    height: 130px; border-radius: 6px; flex-shrink: 0;
+    cursor: zoom-in;
+    transition: transform 0.14s ease, box-shadow 0.14s ease;
+    display: block;
+}
+.gallery img:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.55);
+}
+</style>
+"""
+
+def _render_gallery(imgs: list, label: str = "Images") -> None:
+    """Render a horizontally scrollable image row.
+    Clicking any thumbnail opens a full-page lightbox via window.parent.
+    """
+    if not imgs:
+        st.markdown(
+            f"<span style='color:#666;font-size:0.9em'>{label}: "
+            f"<em>not available</em></span>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    thumbs = "".join(
+        f'<img src="{u}" alt="" loading="lazy" onclick="lbOpen(this.src)">' for u in imgs
+    )
+    html = (
+        _GALLERY_CSS
+        + f'<div class="gallery">{thumbs}</div>'
+        + f"<script>{_LIGHTBOX_JS}</script>"
+    )
+    components.html(html, height=162, scrolling=False)
+
+
+# ─────────────────────────────────────────────────────────────
 # Single field renderer for one product cell
 # ─────────────────────────────────────────────────────────────
 def render_field_cell(field, product):
@@ -546,30 +601,10 @@ def render_field_cell(field, product):
             st.markdown(summary)
 
     elif field == "ImageGallery":
-        imgs = product_data.get("images", [])
-        if imgs:
-            thumbs = "".join(
-                f'<img src="{img}" alt="" onclick="lbOpen(this.src)">' for img in imgs
-            )
-            st.markdown(
-                f'<div class="img-gallery">{thumbs}</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            _na("Product images")
+        _render_gallery(product_data.get("images", []), "Product images")
 
     elif field == "ReviewImages":
-        rimgs = product_data.get("review_images", [])
-        if rimgs:
-            thumbs = "".join(
-                f'<img src="{img}" alt="" onclick="lbOpen(this.src)">' for img in rimgs
-            )
-            st.markdown(
-                f'<div class="img-gallery">{thumbs}</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            _na("Customer review images")
+        _render_gallery(product_data.get("review_images", []), "Customer review images")
 
     else:
         value = product_data.get(field.lower(), "")

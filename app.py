@@ -13,24 +13,85 @@ from bs4 import BeautifulSoup
 st.set_page_config(layout="wide", initial_sidebar_state="collapsed")
 st.title("🛍️ Amazon Product Comparison")
 
-# ── Row divider style injected once ───────────────────────────
+# ── Row divider style + global lightbox injected once ─────────
 st.markdown(
     """
     <style>
     .field-divider { border-top: 1px solid #2a2a2a; margin: 4px 0 4px 0; }
     div[data-testid="column"] { padding: 4px 8px !important; }
+
+    /* ── Lightbox overlay ── */
+    #lb-overlay {
+        display: none; position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.88);
+        z-index: 99999;
+        align-items: center; justify-content: center;
+        cursor: zoom-out;
+    }
+    #lb-overlay.lb-active { display: flex; }
+    #lb-img {
+        max-width: 92vw; max-height: 92vh;
+        border-radius: 10px;
+        box-shadow: 0 8px 60px rgba(0,0,0,0.9);
+        object-fit: contain;
+    }
+    #lb-close {
+        position: fixed; top: 18px; right: 28px;
+        color: #fff; font-size: 2rem; line-height: 1;
+        cursor: pointer; z-index: 100000;
+        background: rgba(0,0,0,0.5); border-radius: 50%;
+        width: 40px; height: 40px;
+        display: flex; align-items: center; justify-content: center;
+    }
+    #lb-close:hover { background: rgba(255,255,255,0.15); }
+
+    /* ── Scrollable gallery ── */
+    .img-gallery {
+        display: flex; overflow-x: auto; padding-bottom: 8px; gap: 8px;
+        scrollbar-width: thin;
+    }
+    .img-gallery::-webkit-scrollbar { height: 5px; }
+    .img-gallery::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+    .img-gallery img {
+        height: 140px; border-radius: 6px; flex-shrink: 0;
+        cursor: zoom-in; transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .img-gallery img:hover {
+        transform: scale(1.04);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
     </style>
+
+    <!-- Global lightbox element (rendered once) -->
+    <div id="lb-overlay" onclick="lbClose()">
+        <span id="lb-close" onclick="event.stopPropagation();lbClose()">&#x2715;</span>
+        <img id="lb-img" src="" alt="">
+    </div>
+    <script>
+    function lbOpen(src) {
+        document.getElementById('lb-img').src = src;
+        document.getElementById('lb-overlay').classList.add('lb-active');
+    }
+    function lbClose() {
+        document.getElementById('lb-overlay').classList.remove('lb-active');
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') lbClose();
+    });
+    </script>
     """,
     unsafe_allow_html=True,
 )
 
-DEFAULT_FIELDS = ["Title", "Price", "Rating", "Customers Say", "ImageGallery"]
+DEFAULT_FIELDS = ["Title", "Price", "Rating", "Customers Say", "ImageGallery", "ReviewImages"]
 ALL_FIELDS = [
     "Title",
     "Price",
     "Rating",
     "Customers Say",
     "ImageGallery",
+    "ReviewImages",
     "Description",
     "Brand",
     "Availability",
@@ -147,6 +208,24 @@ def fetch_amazon_data(url: str) -> dict:
                 if main and main.get("src"):
                     imgs = [main["src"]]
             data["images"] = imgs
+
+        # ── Review images from "Reviews with images" carousel ──
+        review_imgs = []
+        for img in soup.select(
+            "#cr-media-carousel img, "
+            "[data-hook='cr-media-carousel'] img, "
+            ".cr-lighthouse-media-grid img, "
+            "[data-hook='cr-media-carousel-container'] img"
+        ):
+            src = img.get("src") or img.get("data-src") or ""
+            if src.startswith("https"):
+                large = re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", src)
+                review_imgs.append(large)
+        if not review_imgs:
+            for thumb in re.findall(r'"thumb"\s*:\s*"(https://[^"]+)"', r.text):
+                large = re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", thumb)
+                review_imgs.append(large)
+        data["review_images"] = list(dict.fromkeys(review_imgs))
 
         # ── Customers Say — updated selectors ──────────────────
         customers_say = "N/A"
@@ -439,18 +518,28 @@ def render_field_cell(field, product):
     elif field == "ImageGallery":
         imgs = product_data.get("images", [])
         if imgs:
+            thumbs = "".join(
+                f'<img src="{img}" alt="" onclick="lbOpen(this.src)">' for img in imgs
+            )
             st.markdown(
-                "<style>"
-                ".scrolling-wrapper{display:flex;overflow-x:auto;padding-bottom:8px}"
-                ".scrolling-wrapper img{height:140px;margin-right:8px;border-radius:6px}"
-                "</style>"
-                '<div class="scrolling-wrapper">'
-                + "".join(f'<img src="{img}" alt="">' for img in imgs)
-                + "</div>",
+                f'<div class="img-gallery">{thumbs}</div>',
                 unsafe_allow_html=True,
             )
         else:
-            _na("Images")
+            _na("Product images")
+
+    elif field == "ReviewImages":
+        rimgs = product_data.get("review_images", [])
+        if rimgs:
+            thumbs = "".join(
+                f'<img src="{img}" alt="" onclick="lbOpen(this.src)">' for img in rimgs
+            )
+            st.markdown(
+                f'<div class="img-gallery">{thumbs}</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            _na("Customer review images")
 
     else:
         value = product_data.get(field.lower(), "")

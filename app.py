@@ -164,55 +164,86 @@ def fetch_amazon_data(url: str) -> dict:
         asin   = asin_m.group(1) if asin_m else None
 
         def _scrape_review_imgs(html_text, soup_obj):
-            """Pull user-uploaded review photo URLs, skipping avatars and icons."""
+            """
+            Extract user-uploaded review photo URLs.
+
+            Amazon lazy-loads review images: the <img> tags contain placeholder
+            GIFs, while the real URLs live in data-lazyimagesource / data-mediaid
+            attributes on parent divs and buttons.  We target those attributes
+            first, then fall back to img[alt] and JSON data.
+            """
+            seen  = set()
             found = []
 
-            # Broad selector — catches photos wherever Amazon puts them in a review.
-            # We filter out avatars below rather than relying on narrow tile selectors
-            # (those tiles often aren't present in the static HTML).
+            def _add(url):
+                if not url:
+                    return
+                url = url.split("?")[0]            # strip ?aicid=... query params
+                if "media-amazon.com/images/I/" not in url:
+                    return
+                # Upscale any thumbnail suffix to a display-friendly size
+                url = re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", url)
+                if url not in seen:
+                    seen.add(url)
+                    found.append(url)
+
+            # ── Strategy 1: data-lazyimagesource ──────────────────────────────
+            # Amazon stores the actual full-res URL here when images are lazy-loaded.
+            # e.g. <div data-lazyimagesource="https://…/images/I/71rFI-5q4SL.jpg">
+            for el in soup_obj.select("[data-lazyimagesource]"):
+                _add(el.get("data-lazyimagesource", ""))
+
+            # ── Strategy 2: data-mediaid → reconstruct URL ────────────────────
+            # Buttons and containers carry the image hash (e.g. "71rFI-5q4SL");
+            # the full URL is simply https://m.media-amazon.com/images/I/{id}.jpg
+            for el in soup_obj.select("[data-mediaid]"):
+                mid = el.get("data-mediaid", "").strip()
+                # Image IDs are alphanumeric, 8-20 chars; skip short/numeric-only IDs
+                if mid and re.match(r"^[A-Za-z0-9+/]{8,20}$", mid):
+                    _add(f"https://m.media-amazon.com/images/I/{mid}.jpg")
+
+            # ── Strategy 3: img[alt^="Customer Image"] ────────────────────────
+            # Carousel thumbnails use this alt text consistently.
+            # Their src URLs are real (not lazy placeholders) and we can upscale.
+            for img in soup_obj.select('img[alt^="Customer Image"]'):
+                src = img.get("src") or img.get("data-src") or ""
+                # Skip the transparent placeholder GIFs Amazon inserts
+                if "transparent-pixel" in src or "grey-pixel" in src:
+                    continue
+                _add(src)
+
+            # ── Strategy 4: broad review-body selector with avatar exclusion ──
+            # Fallback for pages that render images inline rather than lazily.
             for img in soup_obj.select(
                 "[data-hook='review-image-tile'] img, "
-                "[data-hook='cr-image-stripe-thumbnail'] img, "
-                ".review-image-tile img, "
-                ".cr-media-viewer-group img, "
-                "[data-hook='review'] img, "           # broad — filtered below
-                "#cm_cr-review_list img"               # review list container
+                "[data-hook='review'] img, "
+                "#cm_cr-review_list img"
             ):
-                # Skip images nested inside profile/avatar containers
                 if img.find_parent(class_=re.compile(r"a-profile|avatar", re.I)):
                     continue
                 if img.find_parent(attrs={"data-hook": "genome-widget"}):
                     continue
-
                 src = img.get("src") or img.get("data-src") or ""
-
-                # Must be a real media-amazon user-upload (not a UI sprite)
-                if "media-amazon.com/images/I/" not in src:
+                if "transparent-pixel" in src or "grey-pixel" in src:
                     continue
-
-                # Skip tiny images — avatars encode their small size in the URL
-                # (e.g. _SX38_, _UR40,40_, _CR0,0,30,30_).
-                # Review photos are thumbnailed at ~88 px or larger, never < 50 px.
+                # Skip tiny avatar-dimensioned URLs (_SX38_, _UR40,40_, etc.)
                 if re.search(r"\._(?:SX|SY|UX|UY)[1-4]\d[_.]", src):
                     continue
-                if re.search(r"_UR\d{1,2},\d{1,2}_", src):   # e.g. _UR40,40_
+                if re.search(r"_UR\d{1,2},\d{1,2}_", src):
                     continue
+                _add(src)
 
-                found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", src))
-
-            # JSON fallback: Amazon serialises review-lightbox data as paired
-            # {"thumb":"...","large":"..."} objects.  Product images use "hiRes"
-            # instead, so matching both keys together targets reviews specifically.
+            # ── Strategy 5: JSON fallback ─────────────────────────────────────
+            # Amazon embeds review lightbox data as {"thumb":"…","large":"…"} pairs.
+            # Product images use "hiRes" instead, so this targets reviews only.
             if not found:
                 for _t, large in re.findall(
                     r'"thumb"\s*:\s*"(https://[^"]+)"[^}]{0,300}?"large"\s*:\s*"(https://[^"]+)"',
                     html_text,
                 ):
-                    if "media-amazon.com/images/I/" not in large:
-                        continue
                     if re.search(r"\._(?:SX|SY)[1-4]\d[_.]", large):
                         continue
-                    found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", large))
+                    _add(large)
 
             return found
 

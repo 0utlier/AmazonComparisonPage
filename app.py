@@ -164,30 +164,56 @@ def fetch_amazon_data(url: str) -> dict:
         asin   = asin_m.group(1) if asin_m else None
 
         def _scrape_review_imgs(html_text, soup_obj):
-            """Pull ONLY user-uploaded review photo URLs (not avatars/icons)."""
+            """Pull user-uploaded review photo URLs, skipping avatars and icons."""
             found = []
-            # Target the explicit review-photo tile containers only.
-            # Do NOT use [data-hook='review'] img — that captures profile avatars too.
+
+            # Broad selector — catches photos wherever Amazon puts them in a review.
+            # We filter out avatars below rather than relying on narrow tile selectors
+            # (those tiles often aren't present in the static HTML).
             for img in soup_obj.select(
                 "[data-hook='review-image-tile'] img, "
                 "[data-hook='cr-image-stripe-thumbnail'] img, "
                 ".review-image-tile img, "
-                ".cr-media-viewer-group img"
+                ".cr-media-viewer-group img, "
+                "[data-hook='review'] img, "           # broad — filtered below
+                "#cm_cr-review_list img"               # review list container
             ):
+                # Skip images nested inside profile/avatar containers
+                if img.find_parent(class_=re.compile(r"a-profile|avatar", re.I)):
+                    continue
+                if img.find_parent(attrs={"data-hook": "genome-widget"}):
+                    continue
+
                 src = img.get("src") or img.get("data-src") or ""
-                # Amazon user-uploaded photos always live under /images/I/
-                # Profile pictures and UI icons do not.
-                if "media-amazon.com/images/I/" in src:
-                    found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", src))
-            # JSON fallback: review lightbox data has paired thumb+large keys.
-            # We grab "large" (the display URL) only when it's a user upload path.
+
+                # Must be a real media-amazon user-upload (not a UI sprite)
+                if "media-amazon.com/images/I/" not in src:
+                    continue
+
+                # Skip tiny images — avatars encode their small size in the URL
+                # (e.g. _SX38_, _UR40,40_, _CR0,0,30,30_).
+                # Review photos are thumbnailed at ~88 px or larger, never < 50 px.
+                if re.search(r"\._(?:SX|SY|UX|UY)[1-4]\d[_.]", src):
+                    continue
+                if re.search(r"_UR\d{1,2},\d{1,2}_", src):   # e.g. _UR40,40_
+                    continue
+
+                found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", src))
+
+            # JSON fallback: Amazon serialises review-lightbox data as paired
+            # {"thumb":"...","large":"..."} objects.  Product images use "hiRes"
+            # instead, so matching both keys together targets reviews specifically.
             if not found:
                 for _t, large in re.findall(
-                    r'"thumb"\s*:\s*"(https://[^"]+)"[^}]{0,200}?"large"\s*:\s*"(https://[^"]+)"',
+                    r'"thumb"\s*:\s*"(https://[^"]+)"[^}]{0,300}?"large"\s*:\s*"(https://[^"]+)"',
                     html_text,
                 ):
-                    if "media-amazon.com/images/I/" in large:
-                        found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", large))
+                    if "media-amazon.com/images/I/" not in large:
+                        continue
+                    if re.search(r"\._(?:SX|SY)[1-4]\d[_.]", large):
+                        continue
+                    found.append(re.sub(r"\._[A-Z0-9_,]+_\.", "._SL1000_.", large))
+
             return found
 
         # Pass 1: harvest any images already present on the product page
